@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Building2, MapPin, Phone, Mail, User } from 'lucide-react'
 import Link from 'next/link'
 
-type PropertyType = 'residential_single' | 'residential_complex' | 'commercial_hotel' | 'commercial_resort' | 'community_pool' | 'other'
+type PropertyType = 'residential' | 'commercial' | 'resort' | 'body_corporate'
 
 export default function NewPropertyPage() {
   const router = useRouter()
@@ -14,7 +14,7 @@ export default function NewPropertyPage() {
   
   // Form state
   const [name, setName] = useState('')
-  const [propertyType, setPropertyType] = useState<PropertyType>('residential_single')
+  const [propertyType, setPropertyType] = useState<PropertyType>('residential')
   const [address, setAddress] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
@@ -123,12 +123,10 @@ export default function NewPropertyPage() {
               onChange={(e) => setPropertyType(e.target.value as PropertyType)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
             >
-              <option value="residential_single">Residential - Single Pool</option>
-              <option value="residential_complex">Residential - Complex/Strata</option>
-              <option value="commercial_hotel">Commercial - Hotel</option>
-              <option value="commercial_resort">Commercial - Resort</option>
-              <option value="community_pool">Community Pool</option>
-              <option value="other">Other</option>
+              <option value="residential">Residential</option>
+              <option value="commercial">Commercial</option>
+              <option value="resort">Resort</option>
+              <option value="body_corporate">Body Corporate / Strata</option>
             </select>
           </div>
 

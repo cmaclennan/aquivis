@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge } from 'lucide-react'
 import Link from 'next/link'
 
-type UnitType = 'pool' | 'spa' | 'villa' | 'fountain' | 'water_feature' | 'other'
-type WaterType = 'chlorine' | 'saltwater' | 'bromine' | 'mineral' | 'other'
+type UnitType = 'residential_pool' | 'main_pool' | 'kids_pool' | 'main_spa' | 'rooftop_spa' | 'plunge_pool' | 'villa_pool'
+type WaterType = 'saltwater' | 'freshwater' | 'bromine'
 
 export default function NewUnitPage({
   params,
@@ -22,8 +22,8 @@ export default function NewUnitPage({
   // Form state
   const [unitNumber, setUnitNumber] = useState('')
   const [name, setName] = useState('')
-  const [unitType, setUnitType] = useState<UnitType>('pool')
-  const [waterType, setWaterType] = useState<WaterType>('chlorine')
+  const [unitType, setUnitType] = useState<UnitType>('residential_pool')
+  const [waterType, setWaterType] = useState<WaterType>('saltwater')
   const [volumeLitres, setVolumeLitres] = useState('')
   const [notes, setNotes] = useState('')
   
@@ -150,12 +150,13 @@ export default function NewUnitPage({
               onChange={(e) => setUnitType(e.target.value as UnitType)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
             >
-              <option value="pool">Pool</option>
-              <option value="spa">Spa</option>
-              <option value="villa">Villa (with plunge pool)</option>
-              <option value="fountain">Fountain</option>
-              <option value="water_feature">Water Feature</option>
-              <option value="other">Other</option>
+              <option value="residential_pool">Residential Pool</option>
+              <option value="main_pool">Main Pool (Resort)</option>
+              <option value="kids_pool">Kids Pool (Resort)</option>
+              <option value="main_spa">Main Spa (Resort)</option>
+              <option value="rooftop_spa">Rooftop Spa</option>
+              <option value="plunge_pool">Plunge Pool (Villa)</option>
+              <option value="villa_pool">Villa Pool</option>
             </select>
           </div>
 
@@ -204,11 +205,9 @@ export default function NewUnitPage({
               onChange={(e) => setWaterType(e.target.value as WaterType)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
             >
-              <option value="chlorine">Chlorine</option>
-              <option value="saltwater">Saltwater</option>
+              <option value="saltwater">Saltwater (Chlorinated)</option>
+              <option value="freshwater">Freshwater (Chlorinated)</option>
               <option value="bromine">Bromine</option>
-              <option value="mineral">Mineral</option>
-              <option value="other">Other</option>
             </select>
           </div>
 

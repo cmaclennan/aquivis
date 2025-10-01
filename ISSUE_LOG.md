@@ -38,6 +38,50 @@
 
 ## ✅ Resolved Issues
 
+### Issue #007: Form Enum Values Mismatch with Database Schema
+- **Category:** 🐛 BUG / 🗄️ DATABASE
+- **Severity:** High (blocks property/unit creation)
+- **Date:** 2025-10-01
+- **Status:** ✅ Resolved
+
+**Problem:**
+```
+Error: invalid input value for enum property_type: "commercial_hotel"
+Error: invalid input value for enum unit_type: "pool"
+Error: invalid input value for enum water_type: "chlorine"
+```
+
+**Root Cause:**
+Form dropdowns were using different enum values than what was defined in the database schema:
+
+**Database Schema (Correct):**
+- `property_type`: 'residential', 'commercial', 'resort', 'body_corporate'
+- `unit_type`: 'residential_pool', 'main_pool', 'kids_pool', 'main_spa', 'rooftop_spa', 'plunge_pool', 'villa_pool'
+- `water_type`: 'saltwater', 'freshwater', 'bromine'
+
+**Form Values (Incorrect):**
+- `property_type`: 'residential_single', 'residential_complex', 'commercial_hotel', 'commercial_resort', 'community_pool', 'other'
+- `unit_type`: 'pool', 'spa', 'villa', 'fountain', 'water_feature', 'other'
+- `water_type`: 'chlorine', 'saltwater', 'bromine', 'mineral', 'other'
+
+**Solution Applied:**
+Updated form components to use exact enum values from database:
+1. **`properties/new/page.tsx`** - Fixed property_type dropdown
+2. **`properties/[id]/units/new/page.tsx`** - Fixed unit_type and water_type dropdowns
+3. Updated TypeScript types to match database enums
+4. Updated default values
+
+**Files Modified:**
+- `app/(dashboard)/properties/new/page.tsx`
+- `app/(dashboard)/properties/[id]/units/new/page.tsx`
+
+**Prevention:**
+- Always reference `DATABASE_SCHEMA_COMPLETE.sql` when creating forms with enum values
+- Consider generating TypeScript types from database schema automatically
+- Add schema validation tests
+
+---
+
 ### Issue #006: Companies SELECT Policy Too Restrictive
 - **Category:** 🗄️ DATABASE / 🔒 SECURITY
 - **Severity:** Critical (blocks onboarding)
