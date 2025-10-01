@@ -69,7 +69,7 @@ export default function OnboardingPage() {
             <span className="text-2xl text-white">🌊</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Welcome to Aquivis</h1>
-          <p className="mt-2 text-sm text-gray-600">Let's set up your pool service business</p>
+          <p className="mt-2 text-sm text-gray-600">Let&apos;s set up your pool service business</p>
         </div>
 
         {/* Progress Indicator */}
