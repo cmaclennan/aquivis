@@ -38,6 +38,47 @@
 
 ## ✅ Resolved Issues
 
+### Issue #004: Permission Denied for Schema auth
+- **Category:** 🗄️ DATABASE
+- **Severity:** High (blocking deployment)
+- **Date:** 2025-01-10
+- **Status:** ✅ Resolved
+
+**Problem:**
+```
+ERROR: 42501: permission denied for schema auth
+```
+
+**Root Cause:**
+Helper functions tried to create in protected `auth` schema:
+```sql
+CREATE OR REPLACE FUNCTION auth.user_company_id() ...
+CREATE OR REPLACE FUNCTION auth.is_owner() ...
+```
+Supabase `auth` schema is system-protected. Users cannot create functions there.
+
+**Solution Applied:**
+1. Changed functions to `public` schema:
+   ```sql
+   CREATE OR REPLACE FUNCTION public.user_company_id() ...
+   CREATE OR REPLACE FUNCTION public.is_owner() ...
+   ```
+2. Added STABLE volatility marker (functions read database, don't modify)
+3. Updated ALL RLS policies to use `public.` prefix (global replace)
+
+**Files Modified:**
+- `DATABASE_SCHEMA_COMPLETE.sql` - Changed schema prefix throughout
+
+**Prevention:**
+- Never create functions in system schemas (auth, storage, etc.)
+- Always use `public` schema for custom functions
+- Should have known Supabase permission model
+
+**Verification:**
+User should now re-run entire schema (fourth attempt)
+
+---
+
 ### Issue #003: Index Predicate IMMUTABLE Function Error
 - **Category:** 🗄️ DATABASE
 - **Severity:** High (blocking deployment)

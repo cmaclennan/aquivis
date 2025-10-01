@@ -826,46 +826,46 @@ ALTER TABLE chemical_reference ENABLE ROW LEVEL SECURITY;
 -- ============================================
 
 -- Helper function: Get user's company_id
-CREATE OR REPLACE FUNCTION auth.user_company_id()
+CREATE OR REPLACE FUNCTION public.user_company_id()
 RETURNS UUID AS $$
   SELECT company_id FROM profiles WHERE id = auth.uid();
-$$ LANGUAGE SQL SECURITY DEFINER;
+$$ LANGUAGE SQL SECURITY DEFINER STABLE;
 
 -- Helper function: Check if user is owner
-CREATE OR REPLACE FUNCTION auth.is_owner()
+CREATE OR REPLACE FUNCTION public.is_owner()
 RETURNS BOOLEAN AS $$
   SELECT role = 'owner' FROM profiles WHERE id = auth.uid();
-$$ LANGUAGE SQL SECURITY DEFINER;
+$$ LANGUAGE SQL SECURITY DEFINER STABLE;
 
 -- Companies: Users see own company only
 CREATE POLICY "users_own_company" ON companies
-  FOR ALL USING (id = auth.user_company_id());
+  FOR ALL USING (id = public.user_company_id());
 
 -- Profiles: Users see own company members
 CREATE POLICY "company_members" ON profiles
-  FOR SELECT USING (company_id = auth.user_company_id());
+  FOR SELECT USING (company_id = public.user_company_id());
 
 -- Profiles: Owners can update company members
 CREATE POLICY "owner_manage_members" ON profiles
-  FOR UPDATE USING (company_id = auth.user_company_id() AND auth.is_owner());
+  FOR UPDATE USING (company_id = public.user_company_id() AND public.is_owner());
 
 -- Profiles: Owners can insert company members
 CREATE POLICY "owner_create_members" ON profiles
-  FOR INSERT WITH CHECK (company_id = auth.user_company_id() AND auth.is_owner());
+  FOR INSERT WITH CHECK (company_id = public.user_company_id() AND public.is_owner());
 
 -- Customers: Company isolation
 CREATE POLICY "company_customers" ON customers
-  FOR ALL USING (company_id = auth.user_company_id());
+  FOR ALL USING (company_id = public.user_company_id());
 
 -- Properties: Company isolation
 CREATE POLICY "company_properties" ON properties
-  FOR ALL USING (company_id = auth.user_company_id());
+  FOR ALL USING (company_id = public.user_company_id());
 
 -- Plant rooms: Via property
 CREATE POLICY "company_plant_rooms" ON plant_rooms
   FOR ALL USING (
     property_id IN (
-      SELECT id FROM properties WHERE company_id = auth.user_company_id()
+      SELECT id FROM properties WHERE company_id = public.user_company_id()
     )
   );
 
@@ -873,7 +873,7 @@ CREATE POLICY "company_plant_rooms" ON plant_rooms
 CREATE POLICY "company_units" ON units
   FOR ALL USING (
     property_id IN (
-      SELECT id FROM properties WHERE company_id = auth.user_company_id()
+      SELECT id FROM properties WHERE company_id = public.user_company_id()
     )
   );
 
@@ -883,13 +883,13 @@ CREATE POLICY "company_equipment" ON equipment
     plant_room_id IN (
       SELECT pr.id FROM plant_rooms pr
       JOIN properties p ON pr.property_id = p.id
-      WHERE p.company_id = auth.user_company_id()
+      WHERE p.company_id = public.user_company_id()
     )
     OR
     unit_id IN (
       SELECT u.id FROM units u
       JOIN properties p ON u.property_id = p.id
-      WHERE p.company_id = auth.user_company_id()
+      WHERE p.company_id = public.user_company_id()
     )
   );
 
@@ -899,7 +899,7 @@ CREATE POLICY "company_bookings" ON bookings
     unit_id IN (
       SELECT u.id FROM units u
       JOIN properties p ON u.property_id = p.id
-      WHERE p.company_id = auth.user_company_id()
+      WHERE p.company_id = public.user_company_id()
     )
   );
 
@@ -907,16 +907,16 @@ CREATE POLICY "company_bookings" ON bookings
 CREATE POLICY "service_access" ON services
   FOR SELECT USING (
     property_id IN (
-      SELECT id FROM properties WHERE company_id = auth.user_company_id()
+      SELECT id FROM properties WHERE company_id = public.user_company_id()
     )
-    AND (auth.is_owner() OR technician_id = auth.uid())
+    AND (public.is_owner() OR technician_id = auth.uid())
   );
 
 -- Services: Create - company members only
 CREATE POLICY "service_create" ON services
   FOR INSERT WITH CHECK (
     property_id IN (
-      SELECT id FROM properties WHERE company_id = auth.user_company_id()
+      SELECT id FROM properties WHERE company_id = public.user_company_id()
     )
   );
 
@@ -924,9 +924,9 @@ CREATE POLICY "service_create" ON services
 CREATE POLICY "service_update" ON services
   FOR UPDATE USING (
     property_id IN (
-      SELECT id FROM properties WHERE company_id = auth.user_company_id()
+      SELECT id FROM properties WHERE company_id = public.user_company_id()
     )
-    AND (auth.is_owner() OR technician_id = auth.uid())
+    AND (public.is_owner() OR technician_id = auth.uid())
   );
 
 -- Water tests: Via service
@@ -935,7 +935,7 @@ CREATE POLICY "company_water_tests" ON water_tests
     service_id IN (
       SELECT s.id FROM services s
       JOIN properties p ON s.property_id = p.id
-      WHERE p.company_id = auth.user_company_id()
+      WHERE p.company_id = public.user_company_id()
     )
   );
 
@@ -945,7 +945,7 @@ CREATE POLICY "company_chemicals" ON chemical_additions
     service_id IN (
       SELECT s.id FROM services s
       JOIN properties p ON s.property_id = p.id
-      WHERE p.company_id = auth.user_company_id()
+      WHERE p.company_id = public.user_company_id()
     )
   );
 
@@ -955,7 +955,7 @@ CREATE POLICY "company_equipment_checks" ON equipment_checks
     service_id IN (
       SELECT s.id FROM services s
       JOIN properties p ON s.property_id = p.id
-      WHERE p.company_id = auth.user_company_id()
+      WHERE p.company_id = public.user_company_id()
     )
   );
 
@@ -965,7 +965,7 @@ CREATE POLICY "company_maintenance" ON maintenance_tasks
     service_id IN (
       SELECT s.id FROM services s
       JOIN properties p ON s.property_id = p.id
-      WHERE p.company_id = auth.user_company_id()
+      WHERE p.company_id = public.user_company_id()
     )
   );
 
@@ -975,28 +975,28 @@ CREATE POLICY "company_photos" ON service_photos
     service_id IN (
       SELECT s.id FROM services s
       JOIN properties p ON s.property_id = p.id
-      WHERE p.company_id = auth.user_company_id()
+      WHERE p.company_id = public.user_company_id()
     )
   );
 
 -- Billing reports: OWNER ONLY
 CREATE POLICY "billing_owner_only" ON billing_reports
   FOR ALL USING (
-    company_id = auth.user_company_id() AND auth.is_owner()
+    company_id = public.user_company_id() AND public.is_owner()
   );
 
 -- Time entries: Company isolation
 CREATE POLICY "company_time_entries" ON time_entries
   FOR ALL USING (
     user_id IN (
-      SELECT id FROM profiles WHERE company_id = auth.user_company_id()
+      SELECT id FROM profiles WHERE company_id = public.user_company_id()
     )
   );
 
 -- Wholesale pickups: Company isolation, OWNER ONLY
 CREATE POLICY "wholesale_owner_only" ON wholesale_pickups
   FOR ALL USING (
-    company_id = auth.user_company_id() AND auth.is_owner()
+    company_id = public.user_company_id() AND public.is_owner()
   );
 
 -- Compliance violations: Company isolation
@@ -1005,13 +1005,13 @@ CREATE POLICY "company_violations" ON compliance_violations
     service_id IN (
       SELECT s.id FROM services s
       JOIN properties p ON s.property_id = p.id
-      WHERE p.company_id = auth.user_company_id()
+      WHERE p.company_id = public.user_company_id()
     )
     OR
     lab_test_id IN (
       SELECT lt.id FROM lab_tests lt
       JOIN properties p ON lt.property_id = p.id
-      WHERE p.company_id = auth.user_company_id()
+      WHERE p.company_id = public.user_company_id()
     )
   );
 
@@ -1019,33 +1019,33 @@ CREATE POLICY "company_violations" ON compliance_violations
 CREATE POLICY "company_lab_tests_select" ON lab_tests
   FOR SELECT USING (
     property_id IN (
-      SELECT id FROM properties WHERE company_id = auth.user_company_id()
+      SELECT id FROM properties WHERE company_id = public.user_company_id()
     )
   );
 
 CREATE POLICY "owner_lab_tests_modify" ON lab_tests
   FOR INSERT WITH CHECK (
     property_id IN (
-      SELECT id FROM properties WHERE company_id = auth.user_company_id()
+      SELECT id FROM properties WHERE company_id = public.user_company_id()
     )
-    AND auth.is_owner()
+    AND public.is_owner()
   );
 
 CREATE POLICY "owner_lab_tests_update" ON lab_tests
   FOR UPDATE USING (
     property_id IN (
-      SELECT id FROM properties WHERE company_id = auth.user_company_id()
+      SELECT id FROM properties WHERE company_id = public.user_company_id()
     )
-    AND auth.is_owner()
+    AND public.is_owner()
   );
 
 -- Training flags: OWNER ONLY
 CREATE POLICY "owner_training_flags" ON training_flags
   FOR ALL USING (
     technician_id IN (
-      SELECT id FROM profiles WHERE company_id = auth.user_company_id()
+      SELECT id FROM profiles WHERE company_id = public.user_company_id()
     )
-    AND auth.is_owner()
+    AND public.is_owner()
   );
 
 -- Compliance reference tables: READ-ONLY for all authenticated users
