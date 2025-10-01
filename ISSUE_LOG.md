@@ -38,6 +38,43 @@
 
 ## ✅ Resolved Issues
 
+### Issue #002: Database Deployment - Table Order Error
+- **Category:** 🗄️ DATABASE
+- **Severity:** High (blocking deployment)
+- **Date:** 2025-01-10
+- **Status:** ✅ Resolved
+
+**Problem:**
+```
+ERROR: 42P01: relation "lab_tests" does not exist
+```
+
+**Root Cause:**
+Table creation order error in `DATABASE_SCHEMA_COMPLETE.sql`:
+- `compliance_violations` table was created BEFORE `lab_tests`
+- But `compliance_violations` has foreign key: `lab_test_id REFERENCES lab_tests(id)`
+- Cannot reference a table that doesn't exist yet
+
+**Solution Applied:**
+Reordered tables in SQL schema:
+1. Create `lab_tests` first (line 574)
+2. Then create `compliance_violations` (line 630)
+
+**Files Modified:**
+- `DATABASE_SCHEMA_COMPLETE.sql` - Fixed table order
+
+**Prevention:**
+- Always order tables by dependencies (referenced tables first)
+- Test schema deployment before committing
+- Could add automated dependency checker
+
+**Verification:**
+User should now re-run the entire schema in Supabase SQL Editor
+
+---
+
+## ✅ Resolved Issues
+
 ### Issue #001: npm Security Vulnerabilities on Initial Install
 - **Category:** 🔒 SECURITY
 - **Severity:** Critical (Next.js) + Moderate (jspdf)

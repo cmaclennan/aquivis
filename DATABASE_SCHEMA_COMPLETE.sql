@@ -570,35 +570,7 @@ CREATE TABLE compliance_requirements (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Auto-detected compliance violations
-CREATE TABLE compliance_violations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  
-  -- Source of violation
-  service_id UUID REFERENCES services(id) ON DELETE SET NULL,
-  water_test_id UUID REFERENCES water_tests(id) ON DELETE SET NULL,
-  lab_test_id UUID REFERENCES lab_tests(id) ON DELETE SET NULL,
-  requirement_id UUID REFERENCES compliance_requirements(id) ON DELETE SET NULL,
-  
-  -- Violation details
-  violation_type TEXT NOT NULL, -- 'chemistry', 'microbiological', 'frequency', 'overdue_lab_test'
-  parameter_name TEXT, -- 'ph', 'chlorine', 'bromine', etc.
-  actual_value DECIMAL(10,2),
-  required_min DECIMAL(10,2),
-  required_max DECIMAL(10,2),
-  
-  severity TEXT DEFAULT 'medium', -- 'low', 'medium', 'high'
-  
-  -- Resolution
-  resolved BOOLEAN DEFAULT false,
-  resolved_at TIMESTAMPTZ,
-  resolved_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  resolution_notes TEXT,
-  
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Laboratory test records (bacteria testing)
+-- Laboratory test records (bacteria testing) - MOVED BEFORE compliance_violations
 CREATE TABLE lab_tests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
@@ -652,6 +624,34 @@ CREATE TABLE lab_tests (
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Auto-detected compliance violations - MOVED AFTER lab_tests
+CREATE TABLE compliance_violations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  
+  -- Source of violation
+  service_id UUID REFERENCES services(id) ON DELETE SET NULL,
+  water_test_id UUID REFERENCES water_tests(id) ON DELETE SET NULL,
+  lab_test_id UUID REFERENCES lab_tests(id) ON DELETE SET NULL,
+  requirement_id UUID REFERENCES compliance_requirements(id) ON DELETE SET NULL,
+  
+  -- Violation details
+  violation_type TEXT NOT NULL, -- 'chemistry', 'microbiological', 'frequency', 'overdue_lab_test'
+  parameter_name TEXT, -- 'ph', 'chlorine', 'bromine', etc.
+  actual_value DECIMAL(10,2),
+  required_min DECIMAL(10,2),
+  required_max DECIMAL(10,2),
+  
+  severity TEXT DEFAULT 'medium', -- 'low', 'medium', 'high'
+  
+  -- Resolution
+  resolved BOOLEAN DEFAULT false,
+  resolved_at TIMESTAMPTZ,
+  resolved_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  resolution_notes TEXT,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================
