@@ -166,10 +166,12 @@ CREATE TABLE plant_rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
   name TEXT NOT NULL, -- "Saltwater Plant", "Freshwater Plant"
-  check_frequency_morning BOOLEAN DEFAULT false,
-  check_frequency_afternoon BOOLEAN DEFAULT false,
-  check_frequency_evening BOOLEAN DEFAULT false,
-  check_days INTEGER[] DEFAULT '{0,1,2,3,4,5,6}', -- 0=Sunday, 6=Saturday
+  
+  -- Flexible check frequency
+  check_frequency TEXT DEFAULT 'daily', -- 'daily', '2x_daily', '3x_daily', 'every_other_day', 'weekly', 'custom'
+  check_times TEXT[] DEFAULT '{"07:00", "15:00"}', -- Array of time strings for custom schedules
+  check_days INTEGER[] DEFAULT '{0,1,2,3,4,5,6}', -- 0=Sunday to 6=Saturday, empty array = all days
+  
   is_active BOOLEAN DEFAULT true,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -816,7 +818,107 @@ CREATE POLICY "billing_owner_only" ON billing_reports
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-### 7. Desktop - Billing Report (Admin Only)
+### 7. Desktop - Operations Dashboard (Admin/Manager - Real-time Monitoring)
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  🌊 Aquivis - Operations Dashboard          🔄 Auto-refresh  👤    │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Live Pool Status - All Properties                Today, 3:45 PM  │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │  🔴 ATTENTION REQUIRED (2)                                   │ │
+│  ├──────────────────────────────────────────────────────────────┤ │
+│  │  • Sea Temple Unit 207 - Bromine LOW (15) - 2 hrs ago       │ │
+│  │  • Sheraton Pool #3 - PH HIGH (8.2) - 45 min ago           │ │
+│  │  [View Details] [Alert Technician]                           │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+│                                                                    │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                                                    │
+│  Sheraton Grand Mirage                                             │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │  Plant Room - Saltwater          Last check: 3:15 PM        │   │
+│  │  ✓ All equipment normal                                     │   │
+│  │  • Filters: 5/5 normal pressure (22-26 / 14-17 psi)        │   │
+│  │  • Pumps: 2/2 running (2800 RPM, 50 Hz)                    │   │
+│  │  • Chlorinators: 6/6 at 50%                                 │   │
+│  │  • Balance Tank: 1,250L (normal)                            │   │
+│  │  [View Details] [View Check History]                        │   │
+│  ├────────────────────────────────────────────────────────────┤   │
+│  │  Freshwater Pool                 Last test: 3:30 PM         │   │
+│  │  ✓ All parameters OK                                        │   │
+│  │  PH: 7.4  Chlorine: 2.5 ppm  Alk: 120 ppm                  │   │
+│  │  Tested by: John                                            │   │
+│  │  [View Details]                                             │   │
+│  ├────────────────────────────────────────────────────────────┤   │
+│  │  Saltwater Pool #3               Last test: 2:45 PM         │   │
+│  │  ⚠️ PH HIGH (8.2) - Acid needed                            │   │
+│  │  PH: 8.2 ⚠️  Chlorine: 3.0 ppm ✓  Salt: 3500 ppm ✓       │   │
+│  │  Tested by: Sarah                                           │   │
+│  │  [View Details] [Mark Resolved] [Assign Technician]         │   │
+│  └────────────────────────────────────────────────────────────┘   │
+│                                                                    │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                                                    │
+│  Pullman Sea Temple                                                │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │  Main Pool                       Last service: 2:15 PM      │   │
+│  │  ✓ All parameters OK                                        │   │
+│  │  PH: 7.6  Chlorine: 3.5 ppm  Salt: 3200 ppm                │   │
+│  │  Serviced by: John                                          │   │
+│  │  [View Details]                                             │   │
+│  ├────────────────────────────────────────────────────────────┤   │
+│  │  Unit 207 (Rooftop Spa)          Last service: 1:30 PM      │   │
+│  │  🔴 Bromine LOW (15) - Tablet added but still low           │   │
+│  │  Bromine: 15 ⚠️ (target: 30-50)                            │   │
+│  │  Serviced by: Sarah - 1 tablet added                        │   │
+│  │  [View Details] [Alert Manager] [Schedule Recheck]          │   │
+│  ├────────────────────────────────────────────────────────────┤   │
+│  │  📊 Today's Summary (Sea Temple)                            │   │
+│  │  • Services completed: 12/15                                │   │
+│  │  • All tests OK: 10/12                                      │   │
+│  │  • Issues flagged: 2 (1 low bromine, 1 pending)            │   │
+│  │  [View All Units]                                           │   │
+│  └────────────────────────────────────────────────────────────┘   │
+│                                                                    │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                                                    │
+│  Residential Properties (6)                                        │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │  ✓ All residential pools OK (last 24 hours)                 │   │
+│  │  • 4 serviced today (all parameters normal)                 │   │
+│  │  • 2 scheduled tomorrow                                     │   │
+│  │  [View All]                                                 │   │
+│  └────────────────────────────────────────────────────────────┘   │
+│                                                                    │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                                                    │
+│  📈 Today's Activity Summary                                       │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │  Total services: 28 completed, 6 pending                    │   │
+│  │  Total tests: 42                                            │   │
+│  │  Issues flagged: 2 (action required)                        │   │
+│  │  Active technicians: 3 (John, Sarah, Mike)                  │   │
+│  │  Chemicals used today: $145                                 │   │
+│  └────────────────────────────────────────────────────────────┘   │
+│                                                                    │
+│  [View Yesterday] [View Last Week] [View History] [Export Report]  │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- 🔴 **Alert System** - Automatically highlights out-of-range parameters
+- ⏱️ **Real-time Updates** - Auto-refresh shows latest test results
+- 📊 **Status Overview** - At-a-glance health of all pools/spas
+- 🔍 **Drill-down** - Click any item for full service history
+- 📅 **Historical View** - See yesterday, last week, custom date range
+- 🔔 **Action Items** - Assign technicians, schedule rechecks
+- 📱 **Responsive** - Works on desktop and tablet
+
+### 8. Desktop - Billing Report (Admin Only)
 
 *(Same as before, no changes needed)*
 
@@ -877,6 +979,11 @@ CREATE POLICY "billing_owner_only" ON billing_reports
 - ✅ Service/test/chemical cost tracking
 - ✅ PDF/Excel export
 - ✅ Email reports
+- ✅ **Operations Dashboard (Real-time monitoring)**
+  - Live pool status across all properties
+  - Alert system for out-of-range parameters
+  - Today's activity summary
+  - Historical view (yesterday, last week)
 
 **Week 8: Customer Portal**
 - ✅ Customer access codes
