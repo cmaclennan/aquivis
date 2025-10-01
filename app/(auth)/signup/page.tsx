@@ -11,6 +11,7 @@ export default function SignupPage() {
   const [lastName, setLastName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -35,9 +36,15 @@ export default function SignupPage() {
       if (signUpError) throw signUpError
 
       if (data.user) {
-        // Profile is auto-created by database trigger
-        // Redirect to onboarding to create company
-        router.push('/onboarding')
+        // Check if email confirmation is required
+        if (data.user.identities && data.user.identities.length === 0) {
+          // Email confirmation required
+          setSuccess(true)
+        } else {
+          // No confirmation needed (or already confirmed)
+          // Profile is auto-created by database trigger
+          router.push('/onboarding')
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Failed to create account')
@@ -65,6 +72,18 @@ export default function SignupPage() {
         {/* Signup Form */}
         <div className="rounded-lg bg-white p-8 shadow-lg">
           <h2 className="mb-6 text-2xl font-semibold text-gray-900">Create Account</h2>
+
+          {success && (
+            <div className="mb-4 rounded-lg bg-success-light p-4 text-sm text-success">
+              <h3 className="font-semibold mb-2">✓ Account Created!</h3>
+              <p className="mb-2">
+                We&apos;ve sent a confirmation email to <strong>{email}</strong>
+              </p>
+              <p className="text-xs">
+                Please check your inbox and click the confirmation link to activate your account, then return here to log in.
+              </p>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 rounded-lg bg-error-light p-3 text-sm text-error">
