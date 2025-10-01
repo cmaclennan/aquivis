@@ -21,6 +21,7 @@ export default function NewUnitPage({
   const supabase = createClient()
   
   const [propertyName, setPropertyName] = useState('')
+  const [customers, setCustomers] = useState<Array<{id: string, name: string, customer_type: string}>>([])
   
   // Form state
   const [unitNumber, setUnitNumber] = useState('')
@@ -28,25 +29,51 @@ export default function NewUnitPage({
   const [unitType, setUnitType] = useState<UnitType>('residential_pool')
   const [waterType, setWaterType] = useState<WaterType>('saltwater')
   const [volumeLitres, setVolumeLitres] = useState('')
+  const [billingEntity, setBillingEntity] = useState<'property' | 'unit_owner' | 'hotel' | 'body_corporate'>('property')
+  const [customerId, setCustomerId] = useState<string>('')
   const [notes, setNotes] = useState('')
   
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load property name
+  // Load property name and customers
   useEffect(() => {
-    async function loadProperty() {
-      const { data } = await supabase
+    async function loadData() {
+      // Load property name
+      const { data: property } = await supabase
         .from('properties')
         .select('name')
         .eq('id', propertyId)
         .single()
       
-      if (data) {
-        setPropertyName(data.name)
+      if (property) {
+        setPropertyName(property.name)
+      }
+
+      // Load company customers for dropdown
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single()
+
+        if (profile) {
+          const { data: customersData } = await supabase
+            .from('customers')
+            .select('id, name, customer_type')
+            .eq('company_id', profile.company_id)
+            .eq('is_active', true)
+            .order('name')
+
+          if (customersData) {
+            setCustomers(customersData)
+          }
+        }
       }
     }
-    loadProperty()
+    loadData()
   }, [propertyId, supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,6 +117,8 @@ export default function NewUnitPage({
           unit_type: unitType,
           water_type: waterType,
           volume_litres: volume,
+          billing_entity: billingEntity,
+          customer_id: customerId || null,
           notes: notes.trim() || null,
         })
         .select()
@@ -236,6 +265,62 @@ export default function NewUnitPage({
             <p className="mt-1 text-xs text-gray-500">
               Water volume in litres (used for chemical dosing calculations)
             </p>
+          </div>
+
+          {/* Billing & Ownership */}
+          <div className="mb-6">
+            <h3 className="mb-4 text-sm font-semibold text-gray-900">Billing & Ownership</h3>
+            
+            <div className="space-y-4">
+              {/* Billing Entity */}
+              <div>
+                <label htmlFor="billingEntity" className="mb-2 block text-sm font-medium text-gray-700">
+                  Bill To
+                </label>
+                <select
+                  id="billingEntity"
+                  value={billingEntity}
+                  onChange={(e) => setBillingEntity(e.target.value as typeof billingEntity)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                >
+                  <option value="property">Property Owner</option>
+                  <option value="unit_owner">Individual Unit Owner</option>
+                  <option value="hotel">Hotel / Letting Pool</option>
+                  <option value="body_corporate">Body Corporate</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Who pays for services on this pool/spa
+                </p>
+              </div>
+
+              {/* Customer Assignment */}
+              <div>
+                <label htmlFor="customer" className="mb-2 block text-sm font-medium text-gray-700">
+                  Assign to Customer
+                </label>
+                <select
+                  id="customer"
+                  value={customerId}
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                >
+                  <option value="">No customer assigned</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name} ({customer.customer_type.replace('_', ' ')})
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Link this pool/spa to a specific customer for billing.{' '}
+                  {customers.length === 0 && (
+                    <Link href="/customers/new" className="text-primary hover:text-primary-600">
+                      Add a customer →
+                    </Link>
+                  )}
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Notes */}

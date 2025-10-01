@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { LayoutDashboard, Building2, TrendingUp, Users, LogOut } from 'lucide-react'
+import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut } from 'lucide-react'
 
 export default async function DashboardLayout({
   children,
@@ -63,6 +63,13 @@ export default async function DashboardLayout({
           >
             <Building2 className="h-5 w-5" />
             <span>Properties</span>
+          </a>
+          <a
+            href="/customers"
+            className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <UserCircle className="h-5 w-5" />
+            <span>Customers</span>
           </a>
           {profile.role === 'owner' && (
             <>
