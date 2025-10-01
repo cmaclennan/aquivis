@@ -38,16 +38,22 @@ This platform is built to handle:
 
 ## 📋 Project Status
 
-**Current Phase:** Initial Setup & Planning
+**Current Phase:** Core Development
 
-- [x] Environment verified (Node.js v24.7.0, npm v11.5.1, Git v2.51.0)
-- [x] Git repository initialized
-- [x] Brand assets prepared (logo, colors)
-- [x] Documentation structure created
-- [ ] Database schema design
-- [ ] Next.js project setup
-- [ ] Authentication implementation
-- [ ] Core features (see SETUP_PLAN.md)
+- [x] Environment verified & ready
+- [x] Git repository initialized & organized
+- [x] Brand assets prepared (logo, colors, assets)
+- [x] Documentation structure created & organized
+- [x] Database schema designed & deployed
+- [x] Next.js 15 project setup (App Router + TypeScript)
+- [x] Authentication implemented (Supabase Auth + RLS)
+- [x] Property management (list, create, detail pages)
+- [x] Pool/Spa management (add, view units)
+- [x] Dashboard with progress tracking
+- [ ] Service forms (water testing)
+- [ ] Run sheets (daily schedules)
+- [ ] Equipment tracking
+- [ ] Billing & reports
 
 ---
 
@@ -71,20 +77,41 @@ This platform is built to handle:
 
 ```
 aquivis/
-├── assets/              # Logo, images, media
-├── public/              # Static files (will be created)
-├── src/
-│   ├── app/            # Next.js app directory (routes)
-│   ├── components/     # React components
-│   ├── lib/            # Utilities, helpers
-│   └── types/          # TypeScript types
-├── .env.local          # Environment variables (not committed)
-├── .gitignore          # Git ignore rules
-├── DECISIONS.md        # Technical decisions & rationale
-├── ISSUE_LOG.md        # Bug tracking & solutions
-├── SETUP_PLAN.md       # Comprehensive build plan
-└── README.md           # This file
+├── app/                    # Next.js App Router
+│   ├── (auth)/            # Authentication pages
+│   ├── (dashboard)/       # Protected dashboard routes
+│   └── logout/            # Logout route
+├── assets/                # Brand assets (logos, etc.)
+├── components/            # React components
+│   └── ui/               # Shadcn UI components
+├── docs/                  # 📚 All documentation
+│   ├── ISSUE_LOG.md      # ⭐ Bug tracking (check first!)
+│   ├── DATABASE_ENUMS_REFERENCE.md  # ⭐ ENUM reference
+│   ├── SETUP_PLAN.md     # Project blueprint
+│   ├── DECISIONS.md      # Tech decisions
+│   └── ...               # Other docs
+├── hooks/                 # React hooks
+├── lib/                   # Utilities & helpers
+│   └── supabase/         # Supabase clients
+├── public/                # Static files (logos, icons)
+├── scripts/               # Utility scripts
+│   ├── apply-rls-postgres.js  # DB fix scripts
+│   └── test-*.js         # Testing scripts
+├── sql/                   # 🗄️ Database scripts
+│   ├── DATABASE_SCHEMA_COMPLETE.sql  # ⭐ Main schema
+│   ├── HOTFIX_*.sql      # Applied fixes
+│   └── RLS_*.sql         # RLS policies
+├── .env.local             # Environment variables (not committed)
+├── middleware.ts          # Auth middleware
+├── package.json           # Dependencies
+└── README.md              # This file
 ```
+
+**Key Directories:**
+- **`/docs`** - All documentation and planning
+- **`/sql`** - Database schema and scripts
+- **`/scripts`** - Diagnostic and utility scripts
+- **`/app`** - Application routes and pages
 
 ---
 
@@ -107,25 +134,40 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ### Installation
 
-*Instructions will be added after initial Next.js setup*
+```bash
+# Clone repository (if not already done)
+git clone <repository-url>
+cd aquivis
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+**App will be available at:** http://localhost:3000
 
 ---
 
 ## 🗄️ Database Schema
 
-**Status:** In Design Phase
+**Status:** Designed & Deployed ✅
 
 **Core Entities:**
-- Companies (multi-tenant)
-- Users/Profiles (role-based)
+- Companies (multi-tenant with regional settings)
+- Users/Profiles (role-based access)
 - Properties (residential, commercial, resort, body corporate)
-- Units (pools, spas, villas)
-- Services & Water Tests
-- Equipment & Plant Rooms
-- Bookings (for occupied units)
-- Billing & Reports
+- Units (pools, spas, villas with water types)
+- Services & Water Tests (compliance tracking)
+- Equipment & Plant Rooms (resort features)
+- Bookings (occupancy-based scheduling)
+- Customers & Billing
 
-**Full Schema:** See [SETUP_PLAN.md](./SETUP_PLAN.md#database-schema)
+**Database Files:**
+- **Main Schema:** `sql/DATABASE_SCHEMA_COMPLETE.sql` (24 tables, 11 ENUMs)
+- **ENUM Reference:** `docs/DATABASE_ENUMS_REFERENCE.md` (use for forms!)
+- **Full Documentation:** `docs/SETUP_PLAN.md`
 
 ---
 
@@ -155,23 +197,39 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ## 📚 Documentation
 
-- **[SETUP_PLAN.md](./SETUP_PLAN.md)** - Comprehensive build plan with mockups
-- **[DECISIONS.md](./DECISIONS.md)** - Technical decisions & rationale
-- **[ISSUE_LOG.md](./ISSUE_LOG.md)** - Bug tracking & solutions
-- **[assets/logo-info.md](./assets/logo-info.md)** - Brand guidelines
+**All documentation is in `/docs` directory.** Key documents:
+
+### **Essential Reading**
+- **[docs/ISSUE_LOG.md](./docs/ISSUE_LOG.md)** ⭐ - Bug tracking (check FIRST!)
+- **[docs/DATABASE_ENUMS_REFERENCE.md](./docs/DATABASE_ENUMS_REFERENCE.md)** ⭐ - ENUM values for forms
+- **[docs/SETUP_PLAN.md](./docs/SETUP_PLAN.md)** - Complete project blueprint
+
+### **Architecture & Design**
+- **[docs/DECISIONS.md](./docs/DECISIONS.md)** - Technical decisions & rationale
+- **[docs/RLS_STRATEGY.md](./docs/RLS_STRATEGY.md)** - Row Level Security design
+- **[docs/DATABASE_VALIDATION.md](./docs/DATABASE_VALIDATION.md)** - Schema validation
+
+### **Deployment & Guides**
+- **[docs/DATABASE_DEPLOYMENT_GUIDE.md](./docs/DATABASE_DEPLOYMENT_GUIDE.md)** - How to deploy schema
+- **[docs/PRODUCTION_CHECKLIST.md](./docs/PRODUCTION_CHECKLIST.md)** - Pre-production checklist
+- **[docs/EMAIL_SETUP_GUIDE.md](./docs/EMAIL_SETUP_GUIDE.md)** - Email configuration
+
+**See `/docs/README.md` for complete documentation index.**
 
 ---
 
 ## 🐛 Issue Tracking
 
-**Critical Rule:** Before attempting any fix, check [ISSUE_LOG.md](./ISSUE_LOG.md) to avoid repeating failed solutions.
+**Critical Rule:** Before attempting any fix, check [docs/ISSUE_LOG.md](./docs/ISSUE_LOG.md) to avoid repeating failed solutions.
 
 **Report Issues:**
-1. Check ISSUE_LOG.md first
-2. Document the exact error
+1. Check `docs/ISSUE_LOG.md` first (check for existing solutions)
+2. Document the exact error message
 3. Note what was tried
 4. Record the working solution
-5. Update ISSUE_LOG.md immediately
+5. Update `docs/ISSUE_LOG.md` immediately
+
+**Current Issues:** 7 resolved, 0 active
 
 ---
 
@@ -208,8 +266,9 @@ Proprietary - All rights reserved
 
 ## 📞 Contact
 
-**Developer:** Craig  
+**Developer:** Craig MacLennan  
 **Project Start:** January 10, 2025  
+**Current Sprint:** Core Features (Property & Unit Management)  
 **Target Launch:** ~12 weeks (April 2025)
 
 ---
