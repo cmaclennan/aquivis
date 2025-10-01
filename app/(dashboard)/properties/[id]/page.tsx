@@ -22,12 +22,12 @@ export default async function PropertyDetailPage({
     .eq('id', user!.id)
     .single()
 
-  // Get property with units
+  // Get property with units and customer info
   const { data: property, error } = await supabase
     .from('properties')
     .select(`
       *,
-      units:units(*)
+      units:units(*, customers(name, customer_type))
     `)
     .eq('id', propertyId)
     .eq('company_id', profile!.company_id)
@@ -39,6 +39,12 @@ export default async function PropertyDetailPage({
 
   const units = property.units || []
   const hasUnits = units.length > 0
+  
+  // Separate pools and spas
+  const pools = units.filter(u => !u.unit_type.includes('spa'))
+  const spas = units.filter(u => u.unit_type.includes('spa'))
+  const hasPools = pools.length > 0
+  const hasSpas = spas.length > 0
 
   return (
     <div className="p-8">
@@ -160,25 +166,25 @@ export default async function PropertyDetailPage({
         </div>
       </div>
 
-      {/* Pools & Spas Section */}
-      <div className="rounded-lg bg-white p-6 shadow">
+      {/* Pools Section */}
+      <div className="mb-8 rounded-lg bg-white p-6 shadow">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Pools & Spas</h2>
-            <p className="text-sm text-gray-600">Manage all bodies of water at this property</p>
+            <h2 className="text-lg font-semibold text-gray-900">Pools</h2>
+            <p className="text-sm text-gray-600">Main pools, kids pools, plunge pools, etc.</p>
           </div>
           <Link
             href={`/properties/${propertyId}/units/new`}
             className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 transition-colors"
           >
             <Plus className="h-5 w-5" />
-            <span>Add Pool/Spa</span>
+            <span>Add Pool</span>
           </Link>
         </div>
 
-        {hasUnits ? (
+        {hasPools ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {units.map((unit) => (
+            {pools.map((unit) => (
               <Link
                 key={unit.id}
                 href={`/properties/${propertyId}/units/${unit.id}`}
@@ -186,8 +192,8 @@ export default async function PropertyDetailPage({
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-50">
-                      <Droplets className="h-5 w-5 text-accent-700" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
+                      <Droplets className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
                       <h3 className="font-medium text-gray-900 group-hover:text-primary transition-colors">
@@ -200,33 +206,109 @@ export default async function PropertyDetailPage({
                   </div>
                 </div>
 
-                {unit.volume_litres && (
-                  <div className="text-sm text-gray-600">
-                    <span className="font-medium">{unit.volume_litres.toLocaleString()}</span> L
-                  </div>
-                )}
+                <div className="space-y-2">
+                  {unit.volume_litres && (
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">{unit.volume_litres.toLocaleString()}</span> L
+                    </div>
+                  )}
+                  
+                  {unit.customers && (
+                    <div className="text-xs text-gray-500">
+                      <span className="font-medium">Owner:</span> {unit.customers.name}
+                    </div>
+                  )}
+                  
+                  {unit.billing_entity && unit.billing_entity !== 'property' && (
+                    <div className="text-xs text-gray-500 capitalize">
+                      Bills to: {unit.billing_entity.replace('_', ' ')}
+                    </div>
+                  )}
+                </div>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="flex min-h-[200px] items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+          <div className="flex min-h-[150px] items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
             <div className="text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent-50">
-                <Droplets className="h-6 w-6 text-accent-700" />
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+                <Droplets className="h-6 w-6 text-blue-600" />
               </div>
-              <h3 className="mb-2 text-sm font-semibold text-gray-900">
-                No pools or spas yet
-              </h3>
-              <p className="mb-4 text-sm text-gray-600">
-                Add your first pool or spa to start tracking services
-              </p>
+              <p className="text-sm text-gray-600">No pools yet</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Spas Section */}
+      <div className="rounded-lg bg-white p-6 shadow">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Spas</h2>
+            <p className="text-sm text-gray-600">Rooftop spas, main spas, etc.</p>
+          </div>
+          <Link
+            href={`/properties/${propertyId}/units/new`}
+            className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 transition-colors"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add Spa</span>
+          </Link>
+        </div>
+
+        {hasSpas ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {spas.map((unit) => (
               <Link
-                href={`/properties/${propertyId}/units/new`}
-                className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-600 transition-colors"
+                key={unit.id}
+                href={`/properties/${propertyId}/units/${unit.id}`}
+                className="group rounded-lg border border-gray-200 p-4 hover:border-primary hover:shadow-md transition-all"
               >
-                <Plus className="h-4 w-4" />
-                <span>Add Pool/Spa</span>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50">
+                      <Droplets className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900 group-hover:text-primary transition-colors">
+                        {unit.name || unit.unit_number}
+                      </h3>
+                      <p className="text-sm text-gray-500 capitalize">
+                        {unit.unit_type.replace('_', ' ')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {unit.volume_litres && (
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">{unit.volume_litres.toLocaleString()}</span> L
+                    </div>
+                  )}
+                  
+                  {unit.customers && (
+                    <div className="text-xs text-gray-500">
+                      <span className="font-medium">Owner:</span> {unit.customers.name}
+                    </div>
+                  )}
+                  
+                  {unit.billing_entity && unit.billing_entity !== 'property' && (
+                    <div className="text-xs text-gray-500 capitalize">
+                      Bills to: {unit.billing_entity.replace('_', ' ')}
+                    </div>
+                  )}
+                </div>
               </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="flex min-h-[150px] items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+            <div className="text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-purple-50">
+                <Droplets className="h-6 w-6 text-purple-600" />
+              </div>
+              <p className="text-sm text-gray-600">No spas yet</p>
             </div>
           </div>
         )}
