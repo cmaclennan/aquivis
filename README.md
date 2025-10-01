@@ -6,6 +6,20 @@ Built from scratch with stability and real-world use cases in mind.
 
 ---
 
+## ⚠️ IMPORTANT: Before Making ANY Changes
+
+**👉 READ [`PROJECT_RULES.md`](./PROJECT_RULES.md) FIRST 👈**
+
+This project follows **strict rules** to ensure quality and prevent the issues that plagued the previous version:
+- ✅ No changes without user approval
+- ✅ Thorough reviews always
+- ✅ No shortcuts, only proper solutions
+- ✅ Document and test everything
+
+**Violating these rules wastes time and creates technical debt.** Please respect the process.
+
+---
+
 ## 🎯 Project Overview
 
 Aquivis is a comprehensive pool service management platform designed for:
