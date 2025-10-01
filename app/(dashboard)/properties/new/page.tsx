@@ -15,6 +15,7 @@ export default function NewPropertyPage() {
   // Form state
   const [name, setName] = useState('')
   const [propertyType, setPropertyType] = useState<PropertyType>('residential')
+  const [hasIndividualUnits, setHasIndividualUnits] = useState(false)
   const [address, setAddress] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
@@ -49,6 +50,7 @@ export default function NewPropertyPage() {
           company_id: profile.company_id,
           name: name.trim(),
           property_type: propertyType,
+          has_individual_units: hasIndividualUnits,
           address: address.trim() || null,
           contact_name: contactName.trim() || null,
           contact_email: contactEmail.trim() || null,
@@ -128,6 +130,27 @@ export default function NewPropertyPage() {
               <option value="resort">Resort</option>
               <option value="body_corporate">Body Corporate / Strata</option>
             </select>
+          </div>
+
+          {/* Has Individual Units */}
+          <div className="mb-6">
+            <label className="flex items-start space-x-3">
+              <input
+                type="checkbox"
+                checked={hasIndividualUnits}
+                onChange={(e) => setHasIndividualUnits(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">
+                  Property has individual units
+                </span>
+                <p className="text-xs text-gray-500 mt-1">
+                  Check this if the property has privately owned units (e.g., condos, villas, hotel rooms) with their own pools/spas. 
+                  Leave unchecked for properties with only shared facilities.
+                </p>
+              </div>
+            </label>
           </div>
 
           {/* Address */}
