@@ -41,8 +41,8 @@
 ### Issue #006: Companies SELECT Policy Too Restrictive
 - **Category:** 🗄️ DATABASE / 🔒 SECURITY
 - **Severity:** Critical (blocks onboarding)
-- **Date:** 2025-01-10
-- **Status:** ✅ Resolved
+- **Date:** 2025-10-01
+- **Status:** ✅ RESOLVED - Applied via PostgreSQL
 
 **Problem:**
 ```
@@ -96,15 +96,27 @@ FOR SELECT USING (
 
 **Files Created:**
 - `HOTFIX_COMPANIES_SELECT_FINAL.sql`
+- `FIX_RLS_COMPANIES_FINAL.sql` (comprehensive fix)
+- `scripts/apply-rls-postgres.js` (automated application)
+
+**Final Solution Applied:**
+Successfully applied via direct PostgreSQL connection on 2025-10-01:
+```bash
+node scripts/apply-rls-postgres.js
+# Result: All 4 policies created successfully
+# - companies_select_policy (SELECT)
+# - companies_insert_policy (INSERT)
+# - companies_update_policy (UPDATE)
+# - companies_delete_policy (DELETE)
+```
 
 **Prevention:**
 - Verify SQL file matches documentation
 - Test each policy before claiming it's correct
 - Don't just document what should work - implement it!
+- With service role key, can now test policies directly before user testing
 
 ---
-
-## ✅ Resolved Issues
 
 ### Issue #005: RLS Policy Blocks Profile Creation During Signup
 - **Category:** 🗄️ DATABASE / 🔒 SECURITY
