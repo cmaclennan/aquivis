@@ -1,6 +1,8 @@
-# 📋 Aquivis - Complete Setup & Build Plan
+# 📋 Aquivis - Complete Setup & Build Plan (Updated)
 
 **Purpose:** Comprehensive blueprint for building Aquivis from scratch with visual mockups, database schema, and implementation roadmap.
+
+**Last Updated:** 2025-01-10 - Incorporated navigation decisions, plant room builder, role-based access
 
 ---
 
@@ -34,9 +36,10 @@ aquivis/
 │   │   │   ├── layout.tsx     # Shared dashboard layout
 │   │   │   ├── page.tsx       # Main dashboard
 │   │   │   ├── properties/
-│   │   │   ├── run-sheets/
 │   │   │   ├── service/       # Service forms
-│   │   │   ├── reports/
+│   │   │   ├── reports/       # Admin only
+│   │   │   ├── billing/       # Admin only
+│   │   │   ├── team/          # Admin only
 │   │   │   └── settings/
 │   │   ├── (customer)/        # Customer portal routes
 │   │   │   └── portal/
@@ -50,11 +53,16 @@ aquivis/
 │   ├── components/
 │   │   ├── ui/                # Shadcn components
 │   │   ├── forms/             # Form components
+│   │   │   ├── PoolServiceForm.tsx
+│   │   │   ├── SpaServiceForm.tsx  # Simple single-page
+│   │   │   └── PlantRoomCheckForm.tsx
 │   │   ├── layouts/           # Layout components
-│   │   └── features/          # Feature-specific components
+│   │   ├── features/          # Feature-specific components
+│   │   └── admin/             # Admin-only components
 │   │
 │   ├── lib/
 │   │   ├── supabase/          # Supabase client & utilities
+│   │   ├── rbac.ts            # Role-based access control
 │   │   ├── utils.ts           # Helper functions
 │   │   ├── constants.ts       # App constants
 │   │   └── validations.ts     # Form validations
@@ -79,7 +87,7 @@ aquivis/
 
 ---
 
-## 🗄️ Database Schema
+## 🗄️ Database Schema (Updated)
 
 ### Core Tables Design
 
@@ -89,7 +97,7 @@ aquivis/
 -- ============================================
 
 CREATE TYPE business_type AS ENUM ('residential', 'commercial', 'both');
-CREATE TYPE user_role AS ENUM ('owner', 'technician', 'view_only');
+CREATE TYPE user_role AS ENUM ('owner', 'technician');
 
 -- Companies (tenant isolation)
 CREATE TABLE companies (
@@ -146,13 +154,29 @@ CREATE TABLE properties (
   contact_email TEXT,
   contact_phone TEXT,
   billing_type TEXT DEFAULT 'per_service',
+  total_volume_gallons INTEGER, -- For large resorts (e.g., 25 million litres)
   is_active BOOLEAN DEFAULT true,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Units (pools, spas, etc.)
+-- Plant Rooms (NEW - for commercial/resort properties)
+CREATE TABLE plant_rooms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, -- "Saltwater Plant", "Freshwater Plant"
+  check_frequency_morning BOOLEAN DEFAULT false,
+  check_frequency_afternoon BOOLEAN DEFAULT false,
+  check_frequency_evening BOOLEAN DEFAULT false,
+  check_days INTEGER[] DEFAULT '{0,1,2,3,4,5,6}', -- 0=Sunday, 6=Saturday
+  is_active BOOLEAN DEFAULT true,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Units (pools, spas, villas)
 CREATE TABLE units (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
@@ -173,9 +197,10 @@ CREATE TABLE units (
 -- Equipment (pumps, filters, chlorinators)
 CREATE TABLE equipment (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  property_id UUID REFERENCES properties(id) ON DELETE CASCADE, -- For plant rooms
-  unit_id UUID REFERENCES units(id) ON DELETE CASCADE, -- For individual units
-  equipment_type TEXT NOT NULL, -- 'pump', 'filter', 'chlorinator', 'balance_tank'
+  plant_room_id UUID REFERENCES plant_rooms(id) ON DELETE CASCADE, -- For plant rooms
+  unit_id UUID REFERENCES units(id) ON DELETE CASCADE, -- For individual units/residential
+  equipment_type TEXT NOT NULL, -- 'pump', 'filter', 'chlorinator', 'balance_tank', 'other'
+  measurement_type TEXT, -- 'rpm', 'hz', 'litres', 'percent', 'psi', etc.
   brand TEXT,
   model TEXT,
   serial_number TEXT,
@@ -183,7 +208,7 @@ CREATE TABLE equipment (
   warranty_expiry DATE,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  CHECK (property_id IS NOT NULL OR unit_id IS NOT NULL) -- Must belong to one
+  CHECK (plant_room_id IS NOT NULL OR unit_id IS NOT NULL) -- Must belong to one
 );
 
 -- ============================================
@@ -202,29 +227,18 @@ CREATE TABLE bookings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Run sheet templates (for recurring schedules like Sheraton)
-CREATE TABLE run_sheet_templates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
-  name TEXT NOT NULL, -- e.g., "Sheraton Morning Checks"
-  time_of_day TEXT, -- 'morning', 'afternoon', 'evening'
-  day_of_week INTEGER, -- 0-6 (Sunday-Saturday) or NULL for daily
-  unit_ids UUID[] DEFAULT '{}', -- Array of unit IDs
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- ============================================
 -- SERVICES & WATER TESTING
 -- ============================================
 
-CREATE TYPE service_type AS ENUM ('test_only', 'full_service', 'equipment_check');
+CREATE TYPE service_type AS ENUM ('test_only', 'full_service', 'equipment_check', 'plant_room_check');
 CREATE TYPE service_status AS ENUM ('scheduled', 'in_progress', 'completed', 'skipped');
 
 -- Service records
 CREATE TABLE services (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   unit_id UUID REFERENCES units(id) ON DELETE CASCADE,
+  plant_room_id UUID REFERENCES plant_rooms(id) ON DELETE CASCADE, -- For plant room checks
   property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
   technician_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   service_date TIMESTAMPTZ DEFAULT NOW(),
@@ -232,20 +246,30 @@ CREATE TABLE services (
   status service_status DEFAULT 'scheduled',
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  completed_at TIMESTAMPTZ
+  completed_at TIMESTAMPTZ,
+  CHECK (unit_id IS NOT NULL OR plant_room_id IS NOT NULL) -- Must be for unit or plant room
 );
 
 -- Water test results
 CREATE TABLE water_tests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   service_id UUID REFERENCES services(id) ON DELETE CASCADE,
+  test_time TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Pool tests (saltwater/freshwater)
   ph DECIMAL(3,1),
   chlorine DECIMAL(4,1),
-  bromine DECIMAL(4,1),
   salt INTEGER,
   alkalinity INTEGER,
   calcium INTEGER,
   cyanuric INTEGER,
+  
+  -- Spa tests (bromine)
+  bromine DECIMAL(4,1),
+  is_pump_running BOOLEAN,
+  is_water_warm BOOLEAN,
+  is_filter_cleaned BOOLEAN,
+  
   all_parameters_ok BOOLEAN DEFAULT false,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -255,9 +279,9 @@ CREATE TABLE water_tests (
 CREATE TABLE chemical_additions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   service_id UUID REFERENCES services(id) ON DELETE CASCADE,
-  chemical_type TEXT NOT NULL, -- 'chlorine', 'acid', 'buffer', 'salt', etc.
+  chemical_type TEXT NOT NULL, -- 'chlorine', 'acid', 'buffer', 'salt', 'bromine_tablet', etc.
   quantity DECIMAL(6,2) NOT NULL,
-  unit_of_measure TEXT DEFAULT 'cups', -- 'cups', 'tbsp', 'kg', 'L'
+  unit_of_measure TEXT DEFAULT 'cups', -- 'cups', 'tbsp', 'kg', 'L', 'tablets'
   cost DECIMAL(8,2) DEFAULT 0, -- For billing
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -267,10 +291,10 @@ CREATE TABLE equipment_checks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   service_id UUID REFERENCES services(id) ON DELETE CASCADE,
   equipment_id UUID REFERENCES equipment(id) ON DELETE CASCADE,
-  inlet_pressure INTEGER,
-  outlet_pressure INTEGER,
-  setpoint INTEGER, -- For pumps/chlorinators
-  balance_tank_level TEXT, -- 'normal', 'low', 'high'
+  inlet_pressure INTEGER, -- For filters
+  outlet_pressure INTEGER, -- For filters
+  setpoint DECIMAL(8,2), -- For pumps/chlorinators (RPM, Hz, %)
+  balance_tank_level DECIMAL(10,2), -- Numerical value (litres or %)
   status TEXT DEFAULT 'normal', -- 'normal', 'warning', 'fault'
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -280,7 +304,7 @@ CREATE TABLE equipment_checks (
 CREATE TABLE maintenance_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   service_id UUID REFERENCES services(id) ON DELETE CASCADE,
-  task_type TEXT NOT NULL, -- 'netting', 'vacuuming', 'skimmer_clean', 'filter_clean'
+  task_type TEXT NOT NULL, -- 'netting', 'vacuuming', 'skimmer_clean', 'filter_clean', 'brush_walls'
   completed BOOLEAN DEFAULT false,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -342,7 +366,8 @@ CREATE TABLE billing_reports (
   total_tests INTEGER DEFAULT 0,
   total_chemicals_cost DECIMAL(10,2) DEFAULT 0,
   report_data JSONB, -- Flexible structure for different report types
-  generated_at TIMESTAMPTZ DEFAULT NOW()
+  generated_at TIMESTAMPTZ DEFAULT NOW(),
+  generated_by UUID REFERENCES profiles(id) -- Admin who generated it
 );
 
 -- ============================================
@@ -383,11 +408,17 @@ CREATE TABLE wholesale_pickups (
 -- ============================================
 
 CREATE INDEX idx_profiles_company_id ON profiles(company_id);
+CREATE INDEX idx_profiles_role ON profiles(role);
 CREATE INDEX idx_properties_company_id ON properties(company_id);
+CREATE INDEX idx_plant_rooms_property_id ON plant_rooms(property_id);
 CREATE INDEX idx_units_property_id ON units(property_id);
+CREATE INDEX idx_equipment_plant_room_id ON equipment(plant_room_id);
+CREATE INDEX idx_equipment_unit_id ON equipment(unit_id);
 CREATE INDEX idx_services_unit_id ON services(unit_id);
+CREATE INDEX idx_services_plant_room_id ON services(plant_room_id);
 CREATE INDEX idx_services_technician_id ON services(technician_id);
 CREATE INDEX idx_services_date ON services(service_date);
+CREATE INDEX idx_services_status ON services(status);
 CREATE INDEX idx_bookings_unit_id ON bookings(unit_id);
 CREATE INDEX idx_bookings_dates ON bookings(check_in_date, check_out_date);
 
@@ -399,24 +430,66 @@ CREATE INDEX idx_bookings_dates ON bookings(check_in_date, check_out_date);
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
+ALTER TABLE plant_rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE units ENABLE ROW LEVEL SECURITY;
+ALTER TABLE equipment ENABLE ROW LEVEL SECURITY;
 ALTER TABLE services ENABLE ROW LEVEL SECURITY;
--- ... (enable for all tables)
+ALTER TABLE water_tests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chemical_additions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE equipment_checks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE billing_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE time_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wholesale_pickups ENABLE ROW LEVEL SECURITY;
 
--- Example RLS policies (company isolation)
-CREATE POLICY "Users can view own company data" ON properties
+-- RLS Policies
+
+-- Companies: Users see own company only
+CREATE POLICY "users_own_company" ON companies
+  FOR ALL USING (
+    id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+  );
+
+-- Profiles: Users see own company members
+CREATE POLICY "company_members_visible" ON profiles
   FOR SELECT USING (
-    company_id IN (
-      SELECT company_id FROM profiles WHERE id = auth.uid()
+    company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+  );
+
+-- Properties: Company isolation
+CREATE POLICY "company_properties" ON properties
+  FOR ALL USING (
+    company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+  );
+
+-- Services: Technicians see own services, owners see all
+CREATE POLICY "service_access" ON services
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = auth.uid()
+      AND p.company_id = services.property_id::text::uuid -- Join via property
+      AND (p.role = 'owner' OR services.technician_id = auth.uid())
     )
   );
 
--- Full RLS policies will be added during implementation
+-- Billing Reports: OWNER ONLY
+CREATE POLICY "billing_owner_only" ON billing_reports
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid()
+      AND role = 'owner'
+      AND company_id = billing_reports.company_id
+    )
+  );
+
+-- Similar policies for other tables (all company-isolated)
 ```
 
 ---
 
-## 🎨 Visual Mockups
+## 🎨 Visual Mockups (Updated)
 
 ### Color Palette
 ```css
@@ -432,266 +505,150 @@ CREATE POLICY "Users can view own company data" ON properties
 }
 ```
 
-### 1. Mobile - Daily Run Sheet
+### 1. Mobile - Daily Schedule (Hybrid View)
 
 ```
 ┌─────────────────────────────────────┐
-│ ☰  Today's Schedule      🔔 👤    │ <- Top bar (#2090c3)
+│ ☰  [View: Today ▼]      🔔 👤     │ <- Top bar (#2090c3)
 ├─────────────────────────────────────┤
+│                                     │
+│ Filter: [All Properties ▼]         │
 │                                     │
 │ Sheraton Grand Mirage              │
 │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
 │                                     │
-│ ☀️ Morning Checks (7:00 AM)        │
+│ ☀️ Morning Checks (7:00 AM) - 3    │
 │                                     │
 │ ┌─────────────────────────────┐   │
-│ │ ☐ Freshwater Pool           │   │
-│ │   Test Required             │   │
-│ │   📍 Plant Room #2          │   │
+│ │ ☐ Freshwater Pool Test      │   │
+│ │   [Start Service →]          │   │
 │ └─────────────────────────────┘   │
 │                                     │
 │ ┌─────────────────────────────┐   │
-│ │ ☐ Saltwater Pool #3         │   │
-│ │   Test Required             │   │
-│ │   📍 Main Area              │   │
+│ │ ☐ Saltwater Pool #3 Test    │   │
+│ │   [Start Service →]          │   │
 │ └─────────────────────────────┘   │
 │                                     │
 │ ┌─────────────────────────────┐   │
 │ │ ☐ Plant Room - Saltwater    │   │
-│ │   Equipment Check           │   │
-│ │   🔧 5 filters, 2 pumps     │   │
+│ │   Equipment Check            │   │
+│ │   [Start Check →]            │   │
 │ └─────────────────────────────┘   │
 │                                     │
-│ 🌙 Afternoon Checks (3:00 PM)      │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☐ Saltwater Pool #1         │   │
-│ │   Test Required             │   │
-│ └─────────────────────────────┘   │
+│ 🌙 Afternoon Checks (3:00 PM) - 2  │
+│ (Collapsed - tap to expand)         │
 │                                     │
 ├─────────────────────────────────────┤
 │ Sea Temple - Port Douglas          │
 │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
 │                                     │
-│ 🏊 Main Pools (3)                  │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☐ Main Pool                 │   │
-│ │   Full Service              │   │
-│ │   💧 30,000 gal saltwater   │   │
-│ └─────────────────────────────┘   │
-│                                     │
+│ 🏊 Main Pools (3) - All services   │
 │ 🛁 Occupied Units (12)             │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☐ Unit 203                  │   │
-│ │   Rooftop Spa • Service     │   │
-│ │   Check-out: Tomorrow       │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☐ Unit 207                  │   │
-│ │   Rooftop Spa • Service     │   │
-│ │   Check-out: Jan 15         │   │
-│ └─────────────────────────────┘   │
-│                                     │
 │ ⚠️ Weekly Check Required (3)       │
 │                                     │
-│ ┌─────────────────────────────┐   │
-│ │ 🔴 Unit 301                 │   │
-│ │   Rooftop Spa               │   │
-│ │   ⚠️ 6 days since service   │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│           [Load More Units]         │
+│ [View All Tasks →]                  │
 │                                     │
 ├─────────────────────────────────────┤
-│  📋      📷      ⏰      👤        │ <- Bottom nav
-│ Run Sheet Camera  Time  Profile    │
+│ Smith Residence                     │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
+│                                     │
+│ ┌─────────────────────────────┐   │
+│ │ ☐ Weekly Service            │   │
+│ │   [Start Service →]          │   │
+│ └─────────────────────────────┘   │
+│                                     │
+├─────────────────────────────────────┤
+│  📋      🏢      📷      👤        │ <- Bottom nav
+│ Today  Properties Camera Profile   │
+└─────────────────────────────────────┘
+
+** Switch to "Property View": **
+┌─────────────────────────────────────┐
+│ ☰  [View: Properties ▼]  🔔 👤    │
+├─────────────────────────────────────┤
+│                                     │
+│ My Properties (8)                  │
+│                                     │
+│ ┌─────────────────────────────┐   │
+│ │ 🏢 Sheraton Grand Mirage    │   │
+│ │    Commercial • 9 pools     │   │
+│ │    5 tasks today            │   │
+│ │    [View →]                  │   │
+│ └─────────────────────────────┘   │
+│                                     │
+│ ┌─────────────────────────────┐   │
+│ │ 🏨 Pullman Sea Temple       │   │
+│ │    Body Corp • 85 units     │   │
+│ │    15 tasks today           │   │
+│ │    [View →]                  │   │
+│ └─────────────────────────────┘   │
+│                                     │
+│ ┌─────────────────────────────┐   │
+│ │ 🏡 Smith Residence          │   │
+│ │    Residential • 1 pool     │   │
+│ │    1 task today             │   │
+│ │    [View →]                  │   │
+│ └─────────────────────────────┘   │
+│                                     │
+│         [+ Add Property]            │
+│                                     │
 └─────────────────────────────────────┘
 ```
 
-### 2. Mobile - Service Form (Guided Flow)
+### 2. Mobile - Spa Service Form (SIMPLIFIED - Single Page)
 
 ```
 ┌─────────────────────────────────────┐
 │ ← Unit 203 - Rooftop Spa           │
 ├─────────────────────────────────────┤
 │                                     │
-│ Step 1 of 6                        │
-│ ▓▓▓▓░░░░░░░░░░░░░░░░░░░░           │
+│ Quick Spa Service                  │
+│ 🛁 500 gallon bromine spa          │
 │                                     │
-│ Service Type                       │
+│ Service Type:                       │
+│ ◉ Service    ○ Test Only            │
 │                                     │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
+│                                     │
+│ Bromine Level                       │
 │ ┌─────────────────────────────┐   │
-│ │ ◉ Full Service              │   │
-│ │   Test + Chemicals + Clean  │   │
+│ │      [35]                   │   │
+│ │   Ideal range: 30-50        │   │
 │ └─────────────────────────────┘   │
+│ ✓ Good (auto: <30 = add tablet)    │
 │                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ○ Test Only                 │   │
-│ │   Quick water check         │   │
-│ └─────────────────────────────┘   │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
 │                                     │
+│ Equipment Check                     │
+│ Is pump running?    ◉ Yes  ○ No    │
+│ Is water warm?      ◉ Yes  ○ No    │
+│ Filter cleaned?     ◉ Yes  ○ No    │
 │                                     │
-│              [Next →]               │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
 │                                     │
-└─────────────────────────────────────┘
-
-┌─────────────────────────────────────┐
-│ ← Unit 203 - Rooftop Spa           │
-├─────────────────────────────────────┤
+│ Chemicals Added                     │
+│ ☑ 1 Bromine Tablet                 │
+│   (auto-checked if bromine <30)    │
 │                                     │
-│ Step 2 of 6                        │
-│ ▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░             │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
 │                                     │
-│ Water Test Results                 │
-│ 🛁 Bromine Spa (500 gal)           │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ PH          [7.4]           │   │
-│ │ ━━━━━━━━━━━━━━━━━━━━━━━━   │   │
-│ │ Target: 7.2 - 7.6          │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ Bromine     [3.0] ppm      │   │
-│ │ ━━━━━━━━━━━━━━━━━━━━━━━━   │   │
-│ │ Target: 2.0 - 4.0 ppm      │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ Alkalinity  [120] ppm      │   │
-│ │ ━━━━━━━━━━━━━━━━━━━━━━━━   │   │
-│ │ Target: 80 - 120 ppm       │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ ✓ All parameters OK                │
-│                                     │
-│              [Next →]               │
-│                                     │
-└─────────────────────────────────────┘
-
-┌─────────────────────────────────────┐
-│ ← Unit 203 - Rooftop Spa           │
-├─────────────────────────────────────┤
-│                                     │
-│ Step 3 of 6                        │
-│ ▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░             │
-│                                     │
-│ Chemical Suggestions               │
-│                                     │
-│ 💡 Based on results:               │
-│                                     │
-│ ⚠️ PH Low (6.8)                    │
-│ → Add 0.5 cups Buffer              │
-│                                     │
-│ ⚠️ Bromine Low (1.0 ppm)           │
-│ → Add 2 tbsp Bromine               │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☑ Chemicals Added           │   │
-│ │                             │   │
-│ │ • Buffer: 0.5 cups          │   │
-│ │ • Bromine: 2 tbsp           │   │
-│ │                             │   │
-│ │ Cost: $4.50                 │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☐ No chemicals needed       │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│              [Next →]               │
-│                                     │
-└─────────────────────────────────────┘
-
-┌─────────────────────────────────────┐
-│ ← Unit 203 - Rooftop Spa           │
-├─────────────────────────────────────┤
-│                                     │
-│ Step 4 of 6                        │
-│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░             │
-│                                     │
-│ Maintenance Tasks                  │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☑ Cleaned skimmers          │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☑ Cleaned filter            │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☑ Vacuumed                  │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☑ Brushed walls             │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ☐ Netted debris             │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│              [Next →]               │
-│                                     │
-└─────────────────────────────────────┘
-
-┌─────────────────────────────────────┐
-│ ← Unit 203 - Rooftop Spa           │
-├─────────────────────────────────────┤
-│                                     │
-│ Step 5 of 6                        │
-│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░             │
-│                                     │
-│ Equipment Check                    │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ◉ All working as expected   │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ ┌─────────────────────────────┐   │
-│ │ ○ Warning/Issue             │   │
-│ │   (explain below)           │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│ Notes (optional):                  │
+│ Notes (optional)                    │
 │ ┌─────────────────────────────┐   │
 │ │                             │   │
-│ │                             │   │
 │ └─────────────────────────────┘   │
 │                                     │
-│              [Next →]               │
-│                                     │
-└─────────────────────────────────────┘
-
-┌─────────────────────────────────────┐
-│ ← Unit 203 - Rooftop Spa           │
-├─────────────────────────────────────┤
-│                                     │
-│ Step 6 of 6                        │
-│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓           │
-│                                     │
-│ Service Photos                     │
-│                                     │
-│ ┌───────┐ ┌───────┐               │
-│ │ 📷    │ │       │               │
-│ │       │ │       │               │
-│ │ Photo │ │ Add   │               │
-│ │  #1   │ │ Photo │               │
-│ └───────┘ └───────┘               │
-│                                     │
-│ 💡 Tip: Capture before/after       │
-│                                     │
+│ 📷 [Add Photo (optional)]           │
 │                                     │
 │        [✓ Complete Service]         │
 │                                     │
 └─────────────────────────────────────┘
 ```
 
-### 3. Mobile - Plant Room Check
+### 3. Mobile - Pool Service Form (Guided 6-Step)
+
+*(Kept as originally designed - more complex for pools with multiple parameters)*
+
+### 4. Mobile - Plant Room Check
 
 ```
 ┌─────────────────────────────────────┐
@@ -715,36 +672,29 @@ CREATE POLICY "Users can view own company data" ON properties
 │ │ Inlet  [26] Outlet [16] psi │   │
 │ └─────────────────────────────┘   │
 │                                     │
-│ ┌─────────────────────────────┐   │
-│ │ Filter 3                    │   │
-│ │ Inlet  [24] Outlet [14] psi │   │
-│ └─────────────────────────────┘   │
-│                                     │
-│         [+ Add Filter 4 & 5]        │
+│         [Expand 3 more...]          │
 │                                     │
 │ 💨 Pumps (2)                       │
 │                                     │
 │ ┌─────────────────────────────┐   │
-│ │ Pump 1 Setpoint [2800] RPM  │   │
+│ │ Pump 1                      │   │
+│ │ Setpoint [2800] ▼[RPM]      │   │
 │ └─────────────────────────────┘   │
 │                                     │
 │ ┌─────────────────────────────┐   │
-│ │ Pump 2 Setpoint [2800] RPM  │   │
+│ │ Pump 2                      │   │
+│ │ Setpoint [50] ▼[Hz]         │   │
 │ └─────────────────────────────┘   │
 │                                     │
 │ ⚗️ Chlorinators (6)                │
-│                                     │
 │ ┌─────────────────────────────┐   │
-│ │ Chlor 1  [50]%              │   │
-│ │ Chlor 2  [50]%              │   │
-│ │ Chlor 3  [50]%              │   │
-│ │ ... (show all 6)            │   │
+│ │ Chlor 1-6: [50][50][50]...  │   │
+│ │ All at 50%                  │   │
 │ └─────────────────────────────┘   │
 │                                     │
 │ 💧 Balance Tank                    │
 │ ┌─────────────────────────────┐   │
-│ │ Level: ▼ Normal             │   │
-│ │        (Low/Normal/High)    │   │
+│ │ Level: [1250] litres        │   │
 │ └─────────────────────────────┘   │
 │                                     │
 │ Notes:                             │
@@ -757,206 +707,536 @@ CREATE POLICY "Users can view own company data" ON properties
 └─────────────────────────────────────┘
 ```
 
-### 4. Desktop - Main Dashboard
+### 5. Desktop - Plant Room Builder (Admin Only)
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│  🌊 Aquivis                                    🔔  Settings  👤 Craig│
-├─────────┬──────────────────────────────────────────────────────────┤
-│         │                                                          │
-│  Home   │  Dashboard Overview                      Jan 10, 2025   │
-│         │                                                          │
-│  Prop.  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐      │
-│         │  │  Services   │ │    Tests    │ │ Technicians │      │
-│  Run    │  │  Completed  │ │  Completed  │ │   Active    │      │
-│  Sheets │  │             │ │             │ │             │      │
-│         │  │     18      │ │     12      │ │      3      │      │
-│  Reports│  │   of  24    │ │   of  18    │ │             │      │
-│         │  └─────────────┘ └─────────────┘ └─────────────┘      │
-│  Time   │                                                          │
-│         │  Recent Activity                                         │
-│  Cust.  │  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓  │
-│  Portal │  ┃ • Unit 203 serviced by John       10 min ago    ┃  │
-│         │  ┃ • Main Pool tested by Sarah       25 min ago    ┃  │
-│  ─────  │  ┃ • Sheraton AM checks complete     2 hrs ago     ┃  │
-│         │  ┃ • Villa 105 serviced by Mike      3 hrs ago     ┃  │
-│  Settings│  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛  │
-│         │                                                          │
-│         │  Properties Overview                                     │
-│         │  ┌───────────────────────────────────────────────┐      │
-│         │  │ 🏢 Sheraton Grand Mirage        Commercial    │      │
-│         │  │    9 pools • 15 equipment items               │      │
-│         │  │    Last service: Today 3:15 PM                │      │
-│         │  │    [View Details] [Run Sheet]                 │      │
-│         │  └───────────────────────────────────────────────┘      │
-│         │                                                          │
-│         │  ┌───────────────────────────────────────────────┐      │
-│         │  │ 🏨 Pullman Sea Temple      Body Corporate     │      │
-│         │  │    85 units • 3 main pools                    │      │
-│         │  │    12 services today • 3 pending              │      │
-│         │  │    [View Details] [Bookings] [Billing]        │      │
-│         │  └───────────────────────────────────────────────┘      │
-│         │                                                          │
-│         │  ┌───────────────────────────────────────────────┐      │
-│         │  │ 🏡 Smith Residence          Residential       │      │
-│         │  │    1 pool                                     │      │
-│         │  │    Next service: Tomorrow                     │      │
-│         │  │    [View Details]                             │      │
-│         │  └───────────────────────────────────────────────┘      │
-│         │                                                          │
-└─────────┴──────────────────────────────────────────────────────────┘
-```
-
-### 5. Desktop - Billing Report Generator
-
-```
-┌────────────────────────────────────────────────────────────────────┐
-│  ← Back to Reports                                                 │
+│  ← Back to Sheraton Grand Mirage                                  │
 ├────────────────────────────────────────────────────────────────────┤
 │                                                                    │
-│  Generate Billing Report                                           │
+│  Build Plant Room                                                  │
+│                                                                    │
+│  Plant Room Name: [Saltwater Plant___________________________]    │
+│                                                                    │
+│  Check Schedule:                                                   │
+│  ☑ Morning  ☑ Afternoon  ☐ Evening                                │
+│  Days: ☑ Mon ☑ Tue ☑ Wed ☑ Thu ☑ Fri ☑ Sat ☑ Sun                │
+│                                                                    │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                                                    │
+│  Equipment                                                         │
 │                                                                    │
 │  ┌────────────────────────────────────────────────────────────┐   │
-│  │  Customer:     ▼ Sea Temple Body Corporate                 │   │
+│  │  Equipment Type: ▼ Filter                                  │   │
+│  │  Brand:          [Pentair_______________]                  │   │
+│  │  Model:          [TR140C_________________]                 │   │
+│  │  Serial:         [SN12345_______________]                  │   │
+│  │  Measurement:    Pressure (psi) - inlet/outlet            │   │
+│  │  [Add Equipment]                                           │   │
 │  └────────────────────────────────────────────────────────────┘   │
 │                                                                    │
-│  ┌────────────────────────┐  ┌────────────────────────────────┐   │
-│  │  From: Jan 1, 2025     │  │  To: Jan 31, 2025              │   │
-│  └────────────────────────┘  └────────────────────────────────┘   │
+│  Added Equipment:                                                  │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │  1. Filter 1 (Pentair TR140C) - Pressure tracking         │   │
+│  │  2. Filter 2 (Pentair TR140C) - Pressure tracking         │   │
+│  │  3. Filter 3 (Pentair TR140C) - Pressure tracking         │   │
+│  │  4. Filter 4 (Pentair TR140C) - Pressure tracking         │   │
+│  │  5. Filter 5 (Pentair TR140C) - Pressure tracking         │   │
+│  │  6. Pump 1 (Pentair SuperFlo) - RPM setpoint              │   │
+│  │  7. Pump 2 (Pentair SuperFlo) - Hz setpoint               │   │
+│  │  8. Chlorinator 1 (Zodiac LM3) - % setpoint               │   │
+│  │  ... (3 more chlorinators)                                 │   │
+│  │  12. Balance Tank - Litres (numerical)                     │   │
+│  │                                                            │   │
+│  │  [Edit] [Remove]                                           │   │
+│  └────────────────────────────────────────────────────────────┘   │
 │                                                                    │
-│  Include:  ☑ Services   ☑ Chemicals   ☑ Equipment Checks          │
-│                                                                    │
-│  [Generate Report]                                                 │
-│                                                                    │
-│  ─────────────────────────────────────────────────────────────   │
-│                                                                    │
-│  Sea Temple Billing Report - January 2025                         │
-│                                                                    │
-│  📊 Summary                                                        │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
-│                                                                    │
-│  Main Pools (Body Corporate)                                       │
-│  • Main Pool:  8 services @ $30      $240                         │
-│  • Kids Pool:  8 services @ $30      $240                         │
-│  • Main Spa:   8 services @ $30      $240                         │
-│  • Chemicals used:                   $450                         │
-│  ─────────────────────────────────────────                        │
-│  Subtotal:                         $1,170                         │
-│                                                                    │
-│  Hotel Letting Pool (52 units)                                     │
-│  • Rooftop Spas:   156 services, 78 tests                         │
-│  • Golf Villas:     32 services, 16 tests                         │
-│  • Premium Villas:  13 services, 6 tests                          │
-│  • Chemicals used:                 $2,340                         │
-│  ─────────────────────────────────────────                        │
-│  Subtotal:                         $8,890                         │
-│                                                                    │
-│  Private Owners (by Property Manager)                              │
-│  • ABC Property Mgmt (6 units):    $1,240                         │
-│  • XYZ Realty (4 units):             $820                         │
-│  • Individual owners (8 units):    $2,180                         │
-│  ─────────────────────────────────────────                        │
-│  Subtotal:                         $4,240                         │
-│                                                                    │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
-│  TOTAL:                           $14,300                         │
-│                                                                    │
-│  📄 Detailed Breakdown                                             │
-│  ┌──────────────────────────────────────────────────────────┐    │
-│  │ Date       Unit      Type        Chem.   Tech.   Total   │    │
-│  ├──────────────────────────────────────────────────────────┤    │
-│  │ Jan 1   Main Pool   Service      $15    John      $45    │    │
-│  │ Jan 1   Unit 203    Service      $8     Sarah     $28    │    │
-│  │ Jan 1   Unit 207    Test Only    $0     Sarah     $15    │    │
-│  │ ...     ...         ...          ...    ...       ...    │    │
-│  └──────────────────────────────────────────────────────────┘    │
-│                                                                    │
-│  [Export PDF]  [Export Excel]  [Email Report]                     │
+│  [Save Plant Room]  [Cancel]                                       │
 │                                                                    │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-### 6. Desktop/Tablet - Customer Portal
+### 6. Desktop - Property View (All Users)
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│  🌊 Aquivis Customer Portal                            🔓 Logout   │
+│  ← Back to Properties                                              │
 ├────────────────────────────────────────────────────────────────────┤
 │                                                                    │
-│  Welcome, Sea Temple Unit 203 Owner                                │
+│  Sheraton Grand Mirage                                             │
+│  Commercial Property • Total Volume: 25,000,000L                   │
 │                                                                    │
-│  Your Units                                                        │
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
 │                                                                    │
-│  ┌─────────────────────────┐  ┌─────────────────────────────┐    │
-│  │  📍 Unit 203            │  │  📍 Unit 207                │    │
-│  │  Rooftop Spa            │  │  Rooftop Spa                │    │
-│  │  Last Service:          │  │  Last Service:              │    │
-│  │  Today 9:15 AM          │  │  Yesterday 10:30 AM         │    │
-│  │  Status: ✓ Excellent    │  │  Status: ✓ Good             │    │
-│  │  [View Details]         │  │  [View Details]             │    │
-│  └─────────────────────────┘  └─────────────────────────────┘    │
-│                                                                    │
-│  Recent Service - Unit 203                                         │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
-│                                                                    │
+│  📋 Today's Schedule (8 tasks)                                     │
 │  ┌────────────────────────────────────────────────────────────┐   │
-│  │  Today 9:15 AM - Full Service by John Smith               │   │
+│  │  ☀️ Morning Checks (7:00 AM)                               │   │
+│  │  ☐ Freshwater Pool Test                                    │   │
+│  │  ☐ Saltwater Pool #3 Test                                  │   │
+│  │  ☐ Saltwater Pool #7 Test                                  │   │
+│  │  ☐ Plant Room - Saltwater Check                            │   │
+│  │  ☐ Plant Room - Freshwater Check                           │   │
 │  │                                                            │   │
-│  │  Water Test Results:                                       │   │
-│  │  • PH:         7.4 ✓                                       │   │
-│  │  • Bromine:    3.2 ppm ✓                                   │   │
-│  │  • Alkalinity: 125 ppm ✓                                   │   │
-│  │                                                            │   │
-│  │  Chemicals Added:                                          │   │
-│  │  • None required (all parameters perfect)                  │   │
-│  │                                                            │   │
-│  │  Maintenance:                                              │   │
-│  │  ✓ Cleaned skimmers                                        │   │
-│  │  ✓ Vacuumed                                                │   │
-│  │  ✓ Brushed walls                                           │   │
-│  │  ✓ Filter cleaned                                          │   │
-│  │                                                            │   │
-│  │  Equipment: All working as expected ✓                      │   │
-│  │                                                            │   │
-│  │  [View Photos (2)]                                         │   │
+│  │  🌙 Afternoon Checks (3:00 PM)                             │   │
+│  │  ☐ Freshwater Pool Test                                    │   │
+│  │  ☐ Saltwater Pool #1 Test                                  │   │
+│  │  ☐ Saltwater Pool #5 Test                                  │   │
 │  └────────────────────────────────────────────────────────────┘   │
 │                                                                    │
-│  Water Quality Trend (Last 30 Days)                                │
+│  🔧 Plant Rooms (2)                                                │
 │  ┌────────────────────────────────────────────────────────────┐   │
-│  │  PH Level                                                  │   │
-│  │  8.0 │                                                     │   │
-│  │  7.8 │     ╱──╲                                            │   │
-│  │  7.6 │  ╱─╯    ╲─╲                                         │   │
-│  │  7.4 │─╯          ╲─╲──                                    │   │
-│  │  7.2 │                 ╲─╲──                               │   │
-│  │  7.0 │______________________________________               │   │
-│  │       Jan 1      Jan 15        Jan 30                      │   │
+│  │  Saltwater Plant                                           │   │
+│  │  • 5 Filters, 2 Pumps, 6 Chlorinators, 1 Balance Tank     │   │
+│  │  • Checks: Morning + Afternoon (daily)                     │   │
+│  │  [View] [Edit Equipment] [Check History]                   │   │
+│  ├────────────────────────────────────────────────────────────┤   │
+│  │  Freshwater Plant                                          │   │
+│  │  • 4 Filters, 1 Pump, 1 Chlorinator                        │   │
+│  │  • Checks: Morning + Afternoon (daily)                     │   │
+│  │  [View] [Edit Equipment] [Check History]                   │   │
+│  └────────────────────────────────────────────────────────────┘   │
+│  [+ Add Plant Room] (admin only)                                   │
+│                                                                    │
+│  🏊 Pools (9)                                                      │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │  1. Freshwater Pool (450,000L)                             │   │
+│  │  2. Saltwater Pool #1 (2,800,000L)                         │   │
+│  │  3. Saltwater Pool #2 (2,800,000L)                         │   │
+│  │  ... (6 more pools)                                        │   │
+│  │  [View All]                                                │   │
 │  └────────────────────────────────────────────────────────────┘   │
 │                                                                    │
-│  [View All History]  [Download Reports]                            │
+│  📊 Recent Activity                                                │
+│  • Plant room check completed by John (2 hrs ago)                 │
+│  • Freshwater pool tested by Sarah (3 hrs ago)                    │
+│  • Morning checks completed (5 hrs ago)                           │
 │                                                                    │
-│  ─────────────────────────────────────────────────────────────   │
-│  (Optional feature if enabled)                                     │
-│                                                                    │
-│  📅 Add Booking                                                    │
-│  ┌────────────────────────────────────────────────────────────┐   │
-│  │  Unit:      ▼ Unit 203                                     │   │
-│  │  Check-in:  [Select Date]                                  │   │
-│  │  Check-out: [Select Date]                                  │   │
-│  │  [Submit Booking Request]                                  │   │
-│  └────────────────────────────────────────────────────────────┘   │
+│  [View Full History] [Generate Report] (admin only)                │
 │                                                                    │
 └────────────────────────────────────────────────────────────────────┘
 ```
+
+### 7. Desktop - Billing Report (Admin Only)
+
+*(Same as before, no changes needed)*
 
 ---
 
 ## 🔧 Feature Breakdown
 
-*(See next section of SETUP_PLAN.md - will continue in next message if approved)*
+### Phase 1: Foundation (Weeks 1-4)
+
+**Week 1: Project Setup & Authentication**
+- ✅ Next.js 15 project setup
+- ✅ Supabase integration
+- ✅ Authentication (email/password)
+- ✅ Role-based access (owner vs technician)
+- ✅ Basic UI components (Shadcn)
+- ✅ Theme setup (brand colors)
+
+**Week 2: Company & User Management**
+- ✅ Company onboarding (business type selection)
+- ✅ User profile management
+- ✅ Team invitations
+- ✅ Role assignment
+- ✅ Dashboard layout (navigation)
+
+**Week 3: Property Management**
+- ✅ Add/edit properties
+- ✅ Property types (residential, commercial, resort, body corporate)
+- ✅ Plant room builder (admin only)
+- ✅ Equipment management (flexible types)
+- ✅ Unit management (pools, spas, villas)
+
+**Week 4: Basic Service Logging**
+- ✅ Spa service form (simple single-page)
+- ✅ Pool service form (guided 6-step)
+- ✅ Water test recording
+- ✅ Chemical addition tracking
+- ✅ Photo upload (Supabase storage)
+
+### Phase 2: Advanced Features (Weeks 5-8)
+
+**Week 5: Scheduling & Bookings**
+- ✅ Booking system (Sea Temple occupancy)
+- ✅ Today's schedule generation
+- ✅ Hybrid navigation (Today vs Properties view)
+- ✅ Task filtering and grouping
+- ✅ Occupancy-based task generation
+
+**Week 6: Plant Room & Equipment**
+- ✅ Plant room check forms (dynamic based on equipment)
+- ✅ Equipment status tracking
+- ✅ Maintenance task logging
+- ✅ Equipment check history
+- ✅ Multiple plant rooms per property
+
+**Week 7: Billing & Reports (Admin Only)**
+- ✅ Billing report generator
+- ✅ Multi-entity billing (Sea Temple complexity)
+- ✅ Service/test/chemical cost tracking
+- ✅ PDF/Excel export
+- ✅ Email reports
+
+**Week 8: Customer Portal**
+- ✅ Customer access codes
+- ✅ View water test results
+- ✅ Service history
+- ✅ Trend graphs
+- ✅ Optional booking submission
+
+### Phase 3: Polish & Deploy (Weeks 9-12)
+
+**Week 9: Mobile PWA**
+- ✅ PWA configuration
+- ✅ Offline capability (IndexedDB)
+- ✅ Install prompts
+- ✅ Camera integration
+- ✅ Touch optimization
+
+**Week 10: Additional Features**
+- ✅ Time tracking (clock in/out)
+- ✅ B2B wholesale tracking (simple form)
+- ✅ Notifications
+- ✅ Search & filters
+
+**Week 11: Testing & Refinement**
+- ✅ Field testing with your team
+- ✅ Bug fixes
+- ✅ Performance optimization
+- ✅ UI/UX refinements
+- ✅ Feedback implementation
+
+**Week 12: Launch Preparation**
+- ✅ Production deployment (Vercel)
+- ✅ Monitoring setup (Sentry)
+- ✅ Documentation
+- ✅ Sales materials
+- ✅ Customer onboarding flow
 
 ---
 
-*This is Part 1 of the SETUP_PLAN.md - Ready to continue with Feature Breakdown, Timeline, and Dependencies?*
+## 📦 Dependencies
+
+### Core Dependencies
+```json
+{
+  "dependencies": {
+    "next": "^15.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.8.0",
+    
+    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/ssr": "^0.5.2",
+    
+    "tailwindcss": "^3.4.17",
+    "@tailwindcss/forms": "^0.5.9",
+    "@tailwindcss/typography": "^0.5.16",
+    
+    "lucide-react": "^0.462.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.6.0",
+    
+    "react-hook-form": "^7.61.1",
+    "@hookform/resolvers": "^3.10.0",
+    "zod": "^3.25.76",
+    
+    "date-fns": "^3.6.0",
+    "recharts": "^2.15.4",
+    
+    "zustand": "^5.0.2",
+    "@tanstack/react-query": "^5.83.0",
+    
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.2",
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "eslint": "^9.32.0",
+    "eslint-config-next": "^15.1.0",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    
+    "vitest": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "playwright": "^1.55.1",
+    
+    "@sentry/nextjs": "^10.15.0"
+  }
+}
+```
+
+### Shadcn UI Components (to install)
+```bash
+npx shadcn@latest init
+npx shadcn@latest add button
+npx shadcn@latest add input
+npx shadcn@latest add form
+npx shadcn@latest add select
+npx shadcn@latest add dialog
+npx shadcn@latest add dropdown-menu
+npx shadcn@latest add tabs
+npx shadcn@latest add card
+npx shadcn@latest add badge
+npx shadcn@latest add avatar
+npx shadcn@latest add calendar
+npx shadcn@latest add checkbox
+npx shadcn@latest add switch
+npx shadcn@latest add toast
+npx shadcn@latest add sheet
+npx shadcn@latest add table
+```
+
+---
+
+## 🔧 Environment Setup
+
+### Step 1: Create Next.js Project
+
+```bash
+cd C:\aquivis
+npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --import-alias "@/*"
+```
+
+When prompted:
+- ✅ TypeScript: Yes
+- ✅ ESLint: Yes
+- ✅ Tailwind CSS: Yes
+- ✅ `src/` directory: No (we'll use app router directly)
+- ✅ App Router: Yes
+- ✅ Import alias: Yes (@/*)
+
+### Step 2: Install Dependencies
+
+```bash
+npm install @supabase/supabase-js @supabase/ssr
+npm install react-hook-form @hookform/resolvers zod
+npm install date-fns recharts zustand @tanstack/react-query
+npm install jspdf jspdf-autotable exceljs
+npm install lucide-react class-variance-authority clsx tailwind-merge
+npm install -D @types/node @vitest/ui playwright @sentry/nextjs
+```
+
+### Step 3: Install Shadcn UI
+
+```bash
+npx shadcn@latest init
+```
+
+Configuration:
+- Style: Default
+- Base color: Slate
+- CSS variables: Yes
+
+### Step 4: Configure Tailwind (Brand Colors)
+
+**tailwind.config.ts:**
+```typescript
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          DEFAULT: '#2090c3',
+          50: '#e6f4fa',
+          100: '#cce9f5',
+          200: '#99d3eb',
+          300: '#66bde1',
+          400: '#33a7d7',
+          500: '#2090c3', // Main
+          600: '#1a739c',
+          700: '#135675',
+          800: '#0d394e',
+          900: '#061c27',
+        },
+        accent: {
+          DEFAULT: '#bac2c3',
+          50: '#f5f6f6',
+          100: '#ebeded',
+          200: '#d7dbdb',
+          300: '#c3c9c9',
+          400: '#afb7b7',
+          500: '#bac2c3', // Main
+          600: '#959b9c',
+          700: '#707475',
+          800: '#4a4d4e',
+          900: '#252627',
+        },
+      },
+    },
+  },
+  plugins: [
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+  ],
+}
+export default config
+```
+
+### Step 5: Environment Variables
+
+**Create `.env.local`:**
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://krxabrdizqbpitpsvgiv.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtyeGFicmRpenFicGl0cHN2Z2l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyODM1MTIsImV4cCI6MjA3NDg1OTUxMn0.Og1vlRLR4dEMRvYF4POSifY-oxuCEIqifBlWh4q5Kng
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Sentry (optional)
+NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn_here
+```
+
+**Create `.env.local.example`:**
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Sentry (optional)
+NEXT_PUBLIC_SENTRY_DSN=
+```
+
+### Step 6: Supabase Client Setup
+
+**lib/supabase/client.ts:**
+```typescript
+import { createBrowserClient } from '@supabase/ssr'
+
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+```
+
+**lib/supabase/server.ts:**
+```typescript
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export async function createClient() {
+  const cookieStore = await cookies()
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // Server component - ignore
+          }
+        },
+      },
+    }
+  )
+}
+```
+
+### Step 7: Database Migration
+
+**Run in Supabase SQL Editor:**
+```sql
+-- Copy entire schema from Database Schema section above
+-- Execute in order:
+-- 1. Create ENUMs
+-- 2. Create tables
+-- 3. Create indexes
+-- 4. Enable RLS
+-- 5. Create policies
+```
+
+### Step 8: Run Development Server
+
+```bash
+npm run dev
+```
+
+Visit: http://localhost:3000
+
+---
+
+## 🚀 Implementation Order
+
+### Priority 1: Critical Path (MVP)
+1. Authentication & role-based access
+2. Company & property setup
+3. Service forms (spa + pool)
+4. Today's schedule view
+5. Basic reporting
+
+### Priority 2: Essential Features
+6. Plant room builder
+7. Booking system (Sea Temple)
+8. Equipment tracking
+9. Customer portal
+
+### Priority 3: Nice-to-Have
+10. Time tracking
+11. B2B wholesale
+12. Advanced analytics
+13. Notifications
+
+---
+
+## ✅ Success Criteria
+
+**Phase 1 Complete When:**
+- ✅ Can add properties (Sheraton, Sea Temple, residential)
+- ✅ Can log spa services (simple form)
+- ✅ Can log pool services (guided form)
+- ✅ Today's schedule shows tasks
+- ✅ Mobile responsive
+
+**Phase 2 Complete When:**
+- ✅ Sea Temple bookings generate daily tasks
+- ✅ Plant room checks capture all equipment data
+- ✅ Billing reports work for complex scenarios
+- ✅ Customer portal functional
+
+**Phase 3 Complete When:**
+- ✅ PWA installable on mobile
+- ✅ Works offline (critical features)
+- ✅ Field tested by your team
+- ✅ Ready for paying customers
+
+---
+
+## 🎯 Next Steps
+
+1. **Review this updated plan** - Confirm all changes are correct
+2. **Approve to proceed** - Give go-ahead to start building
+3. **Create Next.js project** - Run initial setup commands
+4. **Implement Phase 1** - Start with authentication
+
+---
+
+*Plan ready for implementation. Awaiting approval to begin development.*
 
