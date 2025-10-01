@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { Building2, CheckCircle2, User, Sparkles, Check } from 'lucide-react'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -29,7 +30,7 @@ export default async function DashboardPage() {
               <p className="mt-2 text-3xl font-bold text-gray-900">0</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-50">
-              <span className="text-2xl">🏢</span>
+              <Building2 className="h-6 w-6 text-primary" />
             </div>
           </div>
           <p className="mt-4 text-sm text-gray-600">
@@ -46,7 +47,7 @@ export default async function DashboardPage() {
               <p className="mt-2 text-3xl font-bold text-gray-900">0</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-light">
-              <span className="text-2xl">✓</span>
+              <CheckCircle2 className="h-6 w-6 text-success" />
             </div>
           </div>
           <p className="mt-4 text-sm text-gray-600">No services scheduled</p>
@@ -59,7 +60,7 @@ export default async function DashboardPage() {
               <p className="mt-2 text-3xl font-bold text-gray-900">1</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-100">
-              <span className="text-2xl">👤</span>
+              <User className="h-6 w-6 text-accent-700" />
             </div>
           </div>
           {profile?.role === 'owner' && (
@@ -79,7 +80,7 @@ export default async function DashboardPage() {
 
         <div className="mt-6 space-y-4">
           <div className="flex items-start space-x-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white text-sm font-medium">
               1
             </div>
             <div>
@@ -92,7 +93,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="flex items-start space-x-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500 text-sm font-medium">
               2
             </div>
             <div>
@@ -102,7 +103,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="flex items-start space-x-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500 text-sm font-medium">
               3
             </div>
             <div>
@@ -115,16 +116,34 @@ export default async function DashboardPage() {
 
       {/* System Info */}
       <div className="mt-8 rounded-lg border border-primary-200 bg-primary-50 p-6">
-        <h3 className="font-medium text-primary-900">✨ Aquivis is Ready!</h3>
+        <div className="flex items-center space-x-2">
+          <Sparkles className="h-5 w-5 text-primary-700" />
+          <h3 className="font-medium text-primary-900">Aquivis is Ready!</h3>
+        </div>
         <p className="mt-2 text-sm text-primary-700">
           Your pool service management platform is set up with:
         </p>
-        <ul className="mt-3 space-y-1 text-sm text-primary-700">
-          <li>✓ QLD Health compliance tracking</li>
-          <li>✓ Mobile-optimized service forms</li>
-          <li>✓ Real-time operations dashboard</li>
-          <li>✓ Chemical cheat sheet reference</li>
-          <li>✓ Secure role-based access</li>
+        <ul className="mt-3 space-y-2 text-sm text-primary-700">
+          <li className="flex items-center space-x-2">
+            <Check className="h-4 w-4 flex-shrink-0" />
+            <span>QLD Health compliance tracking</span>
+          </li>
+          <li className="flex items-center space-x-2">
+            <Check className="h-4 w-4 flex-shrink-0" />
+            <span>Mobile-optimized service forms</span>
+          </li>
+          <li className="flex items-center space-x-2">
+            <Check className="h-4 w-4 flex-shrink-0" />
+            <span>Real-time operations dashboard</span>
+          </li>
+          <li className="flex items-center space-x-2">
+            <Check className="h-4 w-4 flex-shrink-0" />
+            <span>Chemical cheat sheet reference</span>
+          </li>
+          <li className="flex items-center space-x-2">
+            <Check className="h-4 w-4 flex-shrink-0" />
+            <span>Secure role-based access</span>
+          </li>
         </ul>
       </div>
     </div>
