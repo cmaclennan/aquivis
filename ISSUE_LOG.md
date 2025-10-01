@@ -38,6 +38,48 @@
 
 ## ✅ Resolved Issues
 
+### Issue #003: Index Predicate IMMUTABLE Function Error
+- **Category:** 🗄️ DATABASE
+- **Severity:** High (blocking deployment)
+- **Date:** 2025-01-10
+- **Status:** ✅ Resolved
+
+**Problem:**
+```
+ERROR: 42P17: functions in index predicate must be marked IMMUTABLE
+```
+
+**Root Cause:**
+Partial index on bookings table used CURRENT_DATE in WHERE clause:
+```sql
+CREATE INDEX idx_bookings_active ON bookings(...) 
+  WHERE check_out_date >= CURRENT_DATE;
+```
+CURRENT_DATE is VOLATILE (changes daily), not IMMUTABLE. PostgreSQL requires IMMUTABLE functions in index predicates.
+
+**Solution Applied:**
+Removed the problematic partial index. Active bookings will be filtered in application queries instead:
+```sql
+-- Removed partial index
+-- Will filter WHERE check_out_date >= CURRENT_DATE in queries
+```
+
+**Files Modified:**
+- `DATABASE_SCHEMA_COMPLETE.sql` - Removed line 752-753
+
+**Root Cause of Issue:**
+- Insufficient systematic review
+- Didn't check for PostgreSQL-specific requirements
+- Claimed "validated" without line-by-line verification
+
+**Prevention:**
+- Created `SCHEMA_LINE_BY_LINE_REVIEW.md` for systematic validation
+- Review every index predicate for IMMUTABLE requirement
+- Test schema before user deployment
+- Never rush validation
+
+---
+
 ### Issue #002: Database Deployment - Table Order Error
 - **Category:** 🗄️ DATABASE
 - **Severity:** High (blocking deployment)

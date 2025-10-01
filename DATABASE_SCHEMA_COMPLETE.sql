@@ -749,8 +749,8 @@ CREATE INDEX idx_equipment_unit_id ON equipment(unit_id);
 -- Scheduling indexes
 CREATE INDEX idx_bookings_unit_id ON bookings(unit_id);
 CREATE INDEX idx_bookings_dates ON bookings(check_in_date, check_out_date);
-CREATE INDEX idx_bookings_active ON bookings(check_in_date, check_out_date) 
-  WHERE check_out_date >= CURRENT_DATE; -- Active bookings only
+-- Note: Removed partial index with CURRENT_DATE (not IMMUTABLE)
+-- Will filter active bookings in application queries instead
 
 -- Service indexes
 CREATE INDEX idx_services_unit_id ON services(unit_id);
