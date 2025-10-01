@@ -38,6 +38,85 @@
 
 ## ✅ Resolved Issues
 
+### Issue #005: RLS Policy Blocks Profile Creation During Signup
+- **Category:** 🗄️ DATABASE / 🔒 SECURITY
+- **Severity:** Critical (blocks user registration)
+- **Date:** 2025-01-10
+- **Status:** ✅ Resolved
+
+**Problem:**
+```
+Error: new row violates row-level security policy for table "profiles"
+401 Unauthorized on /rest/v1/profiles
+```
+
+**Root Cause:**
+Chicken-and-egg problem with RLS policies:
+1. User signs up (creates auth.user)
+2. App tries to create profile in profiles table
+3. INSERT policy requires: `company_id = public.user_company_id() AND public.is_owner()`
+4. But user doesn't have company_id yet (company not created)
+5. RLS blocks the INSERT
+
+**Original Policy (Too Restrictive):**
+```sql
+CREATE POLICY "owner_create_members" ON profiles
+  FOR INSERT WITH CHECK (company_id = public.user_company_id() AND public.is_owner());
+```
+
+**Solution Applied:**
+Split INSERT policy into two cases:
+1. **Self-registration:** Users can create their OWN profile (id = auth.uid())
+2. **Team invites:** Owners can create profiles for team members
+
+**Fixed Policies:**
+```sql
+-- Users can create their own profile during signup
+CREATE POLICY "users_create_own_profile" ON profiles
+  FOR INSERT WITH CHECK (id = auth.uid());
+
+-- Owners can create team member profiles
+CREATE POLICY "owner_create_team_members" ON profiles
+  FOR INSERT WITH CHECK (
+    company_id = public.user_company_id() 
+    AND public.is_owner()
+    AND id != auth.uid()
+  );
+
+-- Users can update their own profile (add company_id during onboarding)
+CREATE POLICY "users_update_own_profile" ON profiles
+  FOR UPDATE USING (id = auth.uid());
+```
+
+**Files Created:**
+- `HOTFIX_RLS_PROFILES.sql` - First attempt (incomplete)
+- `HOTFIX_RLS_PROFILES_COMPLETE.sql` - Complete fix
+
+**Deployment:**
+User must run HOTFIX_RLS_PROFILES_COMPLETE.sql in Supabase SQL Editor
+
+**Additional Issue Found:**
+The first hotfix only fixed INSERT, but SELECT policy also blocked:
+```sql
+-- Original SELECT (too restrictive):
+FOR SELECT USING (company_id = public.user_company_id());
+-- Blocks users without company_id!
+
+-- Fixed SELECT (allows self):
+FOR SELECT USING (
+  id = auth.uid() OR company_id = public.user_company_id()
+);
+```
+
+**Prevention:**
+- Test complete user flows before deployment
+- Consider RLS implications for signup/onboarding flows
+- Always allow users to manage their own profile
+
+---
+
+## ✅ Resolved Issues
+
 ### Issue #004: Permission Denied for Schema auth
 - **Category:** 🗄️ DATABASE
 - **Severity:** High (blocking deployment)

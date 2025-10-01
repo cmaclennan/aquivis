@@ -20,7 +20,7 @@ export default function SignupPage() {
     setError(null)
 
     try {
-      // Create auth user
+      // Create auth user (trigger will auto-create profile)
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -35,19 +35,7 @@ export default function SignupPage() {
       if (signUpError) throw signUpError
 
       if (data.user) {
-        // Create profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-            role: 'owner', // First user is always owner
-          })
-
-        if (profileError) throw profileError
-
+        // Profile is auto-created by database trigger
         // Redirect to onboarding to create company
         router.push('/onboarding')
       }
