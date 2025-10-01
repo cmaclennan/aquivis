@@ -38,6 +38,74 @@
 
 ## ✅ Resolved Issues
 
+### Issue #006: Companies SELECT Policy Too Restrictive
+- **Category:** 🗄️ DATABASE / 🔒 SECURITY
+- **Severity:** Critical (blocks onboarding)
+- **Date:** 2025-01-10
+- **Status:** ✅ Resolved
+
+**Problem:**
+```
+403 Forbidden on SELECT companies
+Error: new row violates row-level security policy for table "companies"
+```
+
+**Root Cause:**
+The SELECT policy I created was incomplete:
+```sql
+-- What I created (WRONG):
+FOR SELECT USING (
+  EXISTS (SELECT 1 FROM profiles WHERE company_id = companies.id AND id = auth.uid())
+)
+-- This blocks users without a company from even querying!
+
+-- What I DOCUMENTED but didn't implement:
+FOR SELECT USING (
+  EXISTS (...) 
+  OR 
+  NOT EXISTS (user has no company yet)
+)
+```
+
+**The Problem:**
+- I wrote the correct logic in RLS_STRATEGY.md (documentation)
+- But didn't actually implement the OR clause in RLS_SIMPLE_AND_CORRECT.sql
+- Classic mistake: Documentation != Implementation
+
+**Solution Applied:**
+Created `HOTFIX_COMPANIES_SELECT_FINAL.sql` with the complete OR logic:
+```sql
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE profiles.company_id = companies.id 
+    AND profiles.id = auth.uid()
+  )
+  OR
+  NOT EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE profiles.id = auth.uid() 
+    AND profiles.company_id IS NOT NULL
+  )
+);
+```
+
+**Why This Works:**
+- Users with no company: Second part (NOT EXISTS) is TRUE → Query allowed → Returns empty array ✓
+- Users with company: First part (EXISTS) is TRUE → Returns their company only ✓
+
+**Files Created:**
+- `HOTFIX_COMPANIES_SELECT_FINAL.sql`
+
+**Prevention:**
+- Verify SQL file matches documentation
+- Test each policy before claiming it's correct
+- Don't just document what should work - implement it!
+
+---
+
+## ✅ Resolved Issues
+
 ### Issue #005: RLS Policy Blocks Profile Creation During Signup
 - **Category:** 🗄️ DATABASE / 🔒 SECURITY
 - **Severity:** Critical (blocks user registration)
