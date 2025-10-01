@@ -32,13 +32,56 @@
 
 ## 📊 Current Issues
 
-*None - Fresh build started 2025-01-10*
+*None - All initial issues resolved*
 
 ---
 
 ## ✅ Resolved Issues
 
-*Will be populated as issues are encountered and resolved*
+### Issue #001: npm Security Vulnerabilities on Initial Install
+- **Category:** 🔒 SECURITY
+- **Severity:** Critical (Next.js) + Moderate (jspdf)
+- **Date:** 2025-01-10
+- **Status:** ✅ Resolved
+
+**Problem:**
+```
+4 vulnerabilities (1 moderate, 2 high, 1 critical)
+- Next.js 15.1.0: Multiple security issues (DoS, XSS, SSRF, auth bypass)
+- jspdf/dompurify: XSS vulnerability
+```
+
+**Root Cause:**
+Initial package.json specified Next.js 15.1.0 which had known security vulnerabilities
+
+**Solution Applied:**
+```bash
+npm audit fix --force
+```
+
+**Result:**
+- ✅ Next.js upgraded: 15.1.0 → 15.5.4 (security fixes)
+- ✅ jspdf upgraded: 2.5.2 → 3.0.3 (XSS fix)
+- ✅ jspdf-autotable upgraded: 3.8.2 → 5.0.2
+- ✅ All vulnerabilities resolved: **0 vulnerabilities found**
+
+**Impact:**
+- Next.js: Minor version bump, no breaking changes expected
+- jspdf: Major version bump (2.x → 3.x), but no code written yet
+- Will verify PDF functionality when building reports feature
+
+**Prevention:**
+- Run `npm audit` after every install
+- Fix critical/high vulnerabilities immediately
+- Document all security decisions
+
+**Files Modified:**
+- `package.json` - Updated versions
+- `package-lock.json` - Locked new versions
+
+**Verification:**
+- ✅ 0 vulnerabilities remaining
+- Next step: Test dev server works with new versions
 
 ---
 
