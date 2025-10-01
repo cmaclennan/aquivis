@@ -6,8 +6,11 @@ import { ArrowLeft, Droplets, Gauge, Beaker, Wrench, ClipboardList, Calendar } f
 export default async function UnitDetailPage({
   params,
 }: {
-  params: { id: string; unitId: string }
+  params: Promise<{ id: string; unitId: string }>
 }) {
+  // Await params for Next.js 15
+  const { id: propertyId, unitId } = await params
+  
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
@@ -30,8 +33,8 @@ export default async function UnitDetailPage({
         company_id
       )
     `)
-    .eq('id', params.unitId)
-    .eq('property_id', params.id)
+    .eq('id', unitId)
+    .eq('property_id', propertyId)
     .single()
 
   if (error || !unit || unit.property.company_id !== profile!.company_id) {
@@ -48,7 +51,7 @@ export default async function UnitDetailPage({
       {/* Header */}
       <div className="mb-8">
         <Link
-          href={`/properties/${params.id}`}
+          href={`/properties/${propertyId}`}
           className="inline-flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-4"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -72,7 +75,7 @@ export default async function UnitDetailPage({
             </div>
           </div>
           <Link
-            href={`/properties/${params.id}/units/${params.unitId}/edit`}
+            href={`/properties/${propertyId}/units/${unitId}/edit`}
             className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Edit Unit
@@ -133,7 +136,7 @@ export default async function UnitDetailPage({
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Recent Services</h2>
               <Link
-                href={`/properties/${params.id}/units/${params.unitId}/service`}
+                href={`/properties/${propertyId}/units/${unitId}/service`}
                 className="text-sm text-primary hover:text-primary-600"
               >
                 Log Service →
@@ -150,7 +153,7 @@ export default async function UnitDetailPage({
                   <ClipboardList className="mx-auto mb-2 h-8 w-8 text-gray-400" />
                   <p className="text-sm text-gray-600">No services logged yet</p>
                   <Link
-                    href={`/properties/${params.id}/units/${params.unitId}/service`}
+                    href={`/properties/${propertyId}/units/${unitId}/service`}
                     className="mt-2 inline-block text-sm text-primary hover:text-primary-600"
                   >
                     Log your first service →
@@ -169,7 +172,7 @@ export default async function UnitDetailPage({
             
             <div className="space-y-2">
               <Link
-                href={`/properties/${params.id}/units/${params.unitId}/service`}
+                href={`/properties/${propertyId}/units/${unitId}/service`}
                 className="flex items-center space-x-3 rounded-lg border border-gray-200 p-3 hover:border-primary hover:bg-primary-50 transition-all"
               >
                 <Beaker className="h-5 w-5 text-gray-600" />
@@ -177,7 +180,7 @@ export default async function UnitDetailPage({
               </Link>
 
               <Link
-                href={`/properties/${params.id}/units/${params.unitId}/equipment`}
+                href={`/properties/${propertyId}/units/${unitId}/equipment`}
                 className="flex items-center space-x-3 rounded-lg border border-gray-200 p-3 hover:border-primary hover:bg-primary-50 transition-all"
               >
                 <Wrench className="h-5 w-5 text-gray-600" />
@@ -185,7 +188,7 @@ export default async function UnitDetailPage({
               </Link>
 
               <Link
-                href={`/properties/${params.id}/units/${params.unitId}/history`}
+                href={`/properties/${propertyId}/units/${unitId}/history`}
                 className="flex items-center space-x-3 rounded-lg border border-gray-200 p-3 hover:border-primary hover:bg-primary-50 transition-all"
               >
                 <Calendar className="h-5 w-5 text-gray-600" />
@@ -208,7 +211,7 @@ export default async function UnitDetailPage({
                 <Wrench className="mx-auto mb-2 h-8 w-8 text-gray-300" />
                 <p className="text-sm text-gray-600">No equipment added</p>
                 <Link
-                  href={`/properties/${params.id}/units/${params.unitId}/equipment`}
+                  href={`/properties/${propertyId}/units/${unitId}/equipment`}
                   className="mt-2 inline-block text-sm text-primary hover:text-primary-600"
                 >
                   Add equipment →

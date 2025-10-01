@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge } from 'lucide-react'
@@ -12,8 +12,11 @@ type WaterType = 'saltwater' | 'freshwater' | 'bromine'
 export default function NewUnitPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  // Unwrap params Promise for Next.js 15
+  const { id: propertyId } = use(params)
+  
   const router = useRouter()
   const supabase = createClient()
   
@@ -36,7 +39,7 @@ export default function NewUnitPage({
       const { data } = await supabase
         .from('properties')
         .select('name')
-        .eq('id', params.id)
+        .eq('id', propertyId)
         .single()
       
       if (data) {
@@ -44,7 +47,7 @@ export default function NewUnitPage({
       }
     }
     loadProperty()
-  }, [params.id, supabase])
+  }, [propertyId, supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -68,7 +71,7 @@ export default function NewUnitPage({
       const { data: property } = await supabase
         .from('properties')
         .select('id, total_volume_litres')
-        .eq('id', params.id)
+        .eq('id', propertyId)
         .eq('company_id', profile.company_id)
         .single()
 
@@ -81,7 +84,7 @@ export default function NewUnitPage({
       const { data: unit, error: unitError } = await supabase
         .from('units')
         .insert({
-          property_id: params.id,
+          property_id: propertyId,
           unit_number: unitNumber.trim() || null,
           name: name.trim() || null,
           unit_type: unitType,
@@ -100,11 +103,11 @@ export default function NewUnitPage({
         await supabase
           .from('properties')
           .update({ total_volume_litres: newTotal })
-          .eq('id', params.id)
+          .eq('id', propertyId)
       }
 
       // Success - redirect to unit detail page
-      router.push(`/properties/${params.id}/units/${unit.id}`)
+      router.push(`/properties/${propertyId}/units/${unit.id}`)
     } catch (err: any) {
       setError(err.message || 'Failed to create unit')
     } finally {
@@ -117,7 +120,7 @@ export default function NewUnitPage({
       {/* Header */}
       <div className="mb-8">
         <Link
-          href={`/properties/${params.id}`}
+          href={`/properties/${propertyId}`}
           className="inline-flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-4"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -253,7 +256,7 @@ export default function NewUnitPage({
           {/* Actions */}
           <div className="flex items-center justify-end space-x-3 border-t border-gray-200 pt-6">
             <Link
-              href={`/properties/${params.id}`}
+              href={`/properties/${propertyId}`}
               className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Cancel

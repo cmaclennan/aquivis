@@ -6,8 +6,11 @@ import { ArrowLeft, Building2, MapPin, Phone, Mail, User, Plus, Droplets } from 
 export default async function PropertyDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  // Await params for Next.js 15
+  const { id: propertyId } = await params
+  
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
@@ -26,7 +29,7 @@ export default async function PropertyDetailPage({
       *,
       units:units(*)
     `)
-    .eq('id', params.id)
+    .eq('id', propertyId)
     .eq('company_id', profile!.company_id)
     .single()
 
@@ -57,7 +60,7 @@ export default async function PropertyDetailPage({
             </p>
           </div>
           <Link
-            href={`/properties/${property.id}/edit`}
+            href={`/properties/${propertyId}/edit`}
             className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Edit Property
@@ -165,7 +168,7 @@ export default async function PropertyDetailPage({
             <p className="text-sm text-gray-600">Manage all bodies of water at this property</p>
           </div>
           <Link
-            href={`/properties/${property.id}/units/new`}
+            href={`/properties/${propertyId}/units/new`}
             className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 transition-colors"
           >
             <Plus className="h-5 w-5" />
@@ -178,7 +181,7 @@ export default async function PropertyDetailPage({
             {units.map((unit) => (
               <Link
                 key={unit.id}
-                href={`/properties/${property.id}/units/${unit.id}`}
+                href={`/properties/${propertyId}/units/${unit.id}`}
                 className="group rounded-lg border border-gray-200 p-4 hover:border-primary hover:shadow-md transition-all"
               >
                 <div className="flex items-start justify-between mb-3">
@@ -218,7 +221,7 @@ export default async function PropertyDetailPage({
                 Add your first pool or spa to start tracking services
               </p>
               <Link
-                href={`/properties/${property.id}/units/new`}
+                href={`/properties/${propertyId}/units/new`}
                 className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-600 transition-colors"
               >
                 <Plus className="h-4 w-4" />
