@@ -1,0 +1,239 @@
+'use client'
+
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Building2, MapPin, Phone, Mail, User } from 'lucide-react'
+import Link from 'next/link'
+
+type PropertyType = 'residential_single' | 'residential_complex' | 'commercial_hotel' | 'commercial_resort' | 'community_pool' | 'other'
+
+export default function NewPropertyPage() {
+  const router = useRouter()
+  const supabase = createClient()
+  
+  // Form state
+  const [name, setName] = useState('')
+  const [propertyType, setPropertyType] = useState<PropertyType>('residential_single')
+  const [address, setAddress] = useState('')
+  const [contactName, setContactName] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
+  const [notes, setNotes] = useState('')
+  
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Get current user and company
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.company_id) throw new Error('No company found')
+
+      // Create property
+      const { data: property, error: propertyError } = await supabase
+        .from('properties')
+        .insert({
+          company_id: profile.company_id,
+          name: name.trim(),
+          property_type: propertyType,
+          address: address.trim() || null,
+          contact_name: contactName.trim() || null,
+          contact_email: contactEmail.trim() || null,
+          contact_phone: contactPhone.trim() || null,
+          notes: notes.trim() || null,
+        })
+        .select()
+        .single()
+
+      if (propertyError) throw propertyError
+
+      // Success - redirect to property detail page
+      router.push(`/properties/${property.id}`)
+    } catch (err: any) {
+      setError(err.message || 'Failed to create property')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="p-8">
+      {/* Header */}
+      <div className="mb-8">
+        <Link
+          href="/properties"
+          className="inline-flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-4"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to Properties</span>
+        </Link>
+        <h1 className="text-3xl font-bold text-gray-900">Add Property</h1>
+        <p className="mt-2 text-gray-600">
+          Add a new property to manage its pools and units
+        </p>
+      </div>
+
+      {/* Form */}
+      <div className="max-w-2xl">
+        <form onSubmit={handleSubmit} className="rounded-lg bg-white p-6 shadow">
+          {error && (
+            <div className="mb-6 rounded-lg bg-error-light p-4 text-sm text-error">
+              {error}
+            </div>
+          )}
+
+          {/* Property Name */}
+          <div className="mb-6">
+            <label htmlFor="name" className="mb-2 flex items-center space-x-2 text-sm font-medium text-gray-700">
+              <Building2 className="h-4 w-4" />
+              <span>Property Name *</span>
+            </label>
+            <input
+              type="text"
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+              placeholder="e.g., Sheraton Grand Mirage, 123 Smith Street"
+              required
+            />
+          </div>
+
+          {/* Property Type */}
+          <div className="mb-6">
+            <label htmlFor="type" className="mb-2 block text-sm font-medium text-gray-700">
+              Property Type *
+            </label>
+            <select
+              id="type"
+              value={propertyType}
+              onChange={(e) => setPropertyType(e.target.value as PropertyType)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+            >
+              <option value="residential_single">Residential - Single Pool</option>
+              <option value="residential_complex">Residential - Complex/Strata</option>
+              <option value="commercial_hotel">Commercial - Hotel</option>
+              <option value="commercial_resort">Commercial - Resort</option>
+              <option value="community_pool">Community Pool</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          {/* Address */}
+          <div className="mb-6">
+            <label htmlFor="address" className="mb-2 flex items-center space-x-2 text-sm font-medium text-gray-700">
+              <MapPin className="h-4 w-4" />
+              <span>Address</span>
+            </label>
+            <textarea
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+              placeholder="123 Main Street, Suburb, QLD 4000"
+            />
+          </div>
+
+          {/* Contact Information */}
+          <div className="mb-6">
+            <h3 className="mb-4 text-sm font-semibold text-gray-900">Contact Information</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="contactName" className="mb-2 flex items-center space-x-2 text-sm font-medium text-gray-700">
+                  <User className="h-4 w-4" />
+                  <span>Contact Name</span>
+                </label>
+                <input
+                  type="text"
+                  id="contactName"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                  placeholder="Property manager or owner name"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="contactEmail" className="mb-2 flex items-center space-x-2 text-sm font-medium text-gray-700">
+                  <Mail className="h-4 w-4" />
+                  <span>Contact Email</span>
+                </label>
+                <input
+                  type="email"
+                  id="contactEmail"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                  placeholder="contact@example.com"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="contactPhone" className="mb-2 flex items-center space-x-2 text-sm font-medium text-gray-700">
+                  <Phone className="h-4 w-4" />
+                  <span>Contact Phone</span>
+                </label>
+                <input
+                  type="tel"
+                  id="contactPhone"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                  placeholder="0400 000 000"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="mb-6">
+            <label htmlFor="notes" className="mb-2 block text-sm font-medium text-gray-700">
+              Notes
+            </label>
+            <textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+              placeholder="Any special instructions or notes about this property"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end space-x-3 border-t border-gray-200 pt-6">
+            <Link
+              href="/properties"
+              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </Link>
+            <button
+              type="submit"
+              disabled={loading || !name}
+              className="rounded-lg bg-primary px-6 py-2 text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? 'Creating...' : 'Create Property'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
