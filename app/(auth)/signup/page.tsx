@@ -63,8 +63,12 @@ export default function SignupPage() {
       <div className="w-full max-w-md p-8">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary">
-            <span className="text-3xl text-white">🌊</span>
+          <div className="mx-auto mb-4 h-16 w-16">
+            <img 
+              src="/logo-192.png" 
+              alt="Aquivis Logo" 
+              className="h-full w-full object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Aquivis</h1>
           <p className="mt-2 text-sm text-gray-600">Pool Service Management</p>

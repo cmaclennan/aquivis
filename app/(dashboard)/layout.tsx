@@ -32,8 +32,12 @@ export default async function DashboardLayout({
       <aside className="w-64 bg-white border-r border-gray-200">
         <div className="p-6">
           <div className="flex items-center space-x-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
-              <span className="text-xl text-white">🌊</span>
+            <div className="h-10 w-10">
+              <img 
+                src="/logo-192.png" 
+                alt="Aquivis Logo" 
+                className="h-full w-full object-contain"
+              />
             </div>
             <div>
               <h1 className="text-lg font-bold text-gray-900">Aquivis</h1>

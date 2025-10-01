@@ -3,9 +3,12 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-b from-white to-accent-50">
       <div className="text-center">
         <div className="mb-8">
-          {/* Logo will go here */}
-          <div className="w-24 h-24 mx-auto bg-primary rounded-full flex items-center justify-center">
-            <span className="text-white text-4xl">🌊</span>
+          <div className="w-24 h-24 mx-auto">
+            <img 
+              src="/logo-192.png" 
+              alt="Aquivis Logo" 
+              className="w-full h-full object-contain"
+            />
           </div>
         </div>
         
