@@ -11,11 +11,10 @@
 1. [Project Structure](#project-structure)
 2. [Database Schema](#database-schema)
 3. [Visual Mockups](#visual-mockups)
-4. [Compliance System](#compliance-system)
-5. [Feature Breakdown](#feature-breakdown)
-6. [Implementation Timeline](#implementation-timeline)
-7. [Dependencies](#dependencies)
-8. [Environment Setup](#environment-setup)
+4. [Feature Breakdown](#feature-breakdown)
+5. [Implementation Timeline](#implementation-timeline)
+6. [Dependencies](#dependencies)
+7. [Environment Setup](#environment-setup)
 
 ---
 
