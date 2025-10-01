@@ -157,19 +157,19 @@ export default async function PropertyDetailPage({
         </div>
       </div>
 
-      {/* Units Section */}
+      {/* Pools & Spas Section */}
       <div className="rounded-lg bg-white p-6 shadow">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Pools & Units</h2>
-            <p className="text-sm text-gray-600">Manage pools, spas, and villas at this property</p>
+            <h2 className="text-lg font-semibold text-gray-900">Pools & Spas</h2>
+            <p className="text-sm text-gray-600">Manage all bodies of water at this property</p>
           </div>
           <Link
             href={`/properties/${property.id}/units/new`}
             className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 transition-colors"
           >
             <Plus className="h-5 w-5" />
-            <span>Add Unit</span>
+            <span>Add Pool/Spa</span>
           </Link>
         </div>
 
@@ -212,17 +212,17 @@ export default async function PropertyDetailPage({
                 <Droplets className="h-6 w-6 text-accent-700" />
               </div>
               <h3 className="mb-2 text-sm font-semibold text-gray-900">
-                No units yet
+                No pools or spas yet
               </h3>
               <p className="mb-4 text-sm text-gray-600">
-                Add your first pool, spa, or unit to get started
+                Add your first pool or spa to start tracking services
               </p>
               <Link
                 href={`/properties/${property.id}/units/new`}
                 className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-600 transition-colors"
               >
                 <Plus className="h-4 w-4" />
-                <span>Add Unit</span>
+                <span>Add Pool/Spa</span>
               </Link>
             </div>
           </div>

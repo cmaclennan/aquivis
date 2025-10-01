@@ -123,9 +123,9 @@ export default function NewUnitPage({
           <ArrowLeft className="h-4 w-4" />
           <span>Back to {propertyName || 'Property'}</span>
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900">Add Unit</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Add Pool/Spa</h1>
         <p className="mt-2 text-gray-600">
-          Add a pool, spa, or other unit to this property
+          Add a pool, spa, or other body of water to track and service
         </p>
       </div>
 
@@ -160,29 +160,11 @@ export default function NewUnitPage({
             </select>
           </div>
 
-          {/* Unit Number / Identifier */}
+          {/* Name - Primary identifier */}
           <div className="mb-6">
-            <label htmlFor="unitNumber" className="mb-2 flex items-center space-x-2 text-sm font-medium text-gray-700">
+            <label htmlFor="name" className="mb-2 flex items-center space-x-2 text-sm font-medium text-gray-700">
               <Hash className="h-4 w-4" />
-              <span>Unit Number / Identifier</span>
-            </label>
-            <input
-              type="text"
-              id="unitNumber"
-              value={unitNumber}
-              onChange={(e) => setUnitNumber(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
-              placeholder="e.g., 201, Main Pool, Villa 5"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Unique identifier for this unit (room number, location, etc.)
-            </p>
-          </div>
-
-          {/* Name (optional, for descriptive purposes) */}
-          <div className="mb-6">
-            <label htmlFor="name" className="mb-2 block text-sm font-medium text-gray-700">
-              Display Name (Optional)
+              <span>Pool/Spa Name</span>
             </label>
             <input
               type="text"
@@ -190,8 +172,29 @@ export default function NewUnitPage({
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
-              placeholder="e.g., Rooftop Spa, Main Lagoon Pool"
+              placeholder="e.g., Main Pool, Rooftop Spa, Villa 5 Plunge Pool"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Descriptive name for this pool or spa
+            </p>
+          </div>
+
+          {/* Unit Number (optional) */}
+          <div className="mb-6">
+            <label htmlFor="unitNumber" className="mb-2 block text-sm font-medium text-gray-700">
+              Unit/Room Number (Optional)
+            </label>
+            <input
+              type="text"
+              id="unitNumber"
+              value={unitNumber}
+              onChange={(e) => setUnitNumber(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+              placeholder="e.g., 201, Building A"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              For properties with unit numbers (condos, hotels, villas). Leave blank if not applicable.
+            </p>
           </div>
 
           {/* Water Type */}

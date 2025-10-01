@@ -12,6 +12,26 @@ export default async function DashboardPage() {
     .eq('id', user!.id)
     .single()
 
+  // Get actual property count
+  const { count: propertyCount } = await supabase
+    .from('properties')
+    .select('*', { count: 'exact', head: true })
+    .eq('company_id', profile!.company_id)
+
+  // Get unit count
+  const { count: unitCount } = await supabase
+    .from('units')
+    .select('*, properties!inner(*)', { count: 'exact', head: true })
+    .eq('properties.company_id', profile!.company_id)
+
+  // Get today's services (placeholder for now)
+  const todayServiceCount = 0
+
+  // Calculate quick start progress
+  const hasProperties = (propertyCount ?? 0) > 0
+  const hasUnits = (unitCount ?? 0) > 0
+  const hasServices = todayServiceCount > 0
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -27,17 +47,19 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Properties</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">0</p>
+              <p className="mt-2 text-3xl font-bold text-gray-900">{propertyCount ?? 0}</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-50">
               <Building2 className="h-6 w-6 text-primary" />
             </div>
           </div>
-          <p className="mt-4 text-sm text-gray-600">
-            <a href="/properties" className="text-primary hover:text-primary-600">
-              Add your first property →
-            </a>
-          </p>
+          {!hasProperties && (
+            <p className="mt-4 text-sm text-gray-600">
+              <a href="/properties/new" className="text-primary hover:text-primary-600">
+                Add your first property →
+              </a>
+            </p>
+          )}
         </div>
 
         <div className="rounded-lg bg-white p-6 shadow">
@@ -73,46 +95,105 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Quick Start */}
-      <div className="mt-8 rounded-lg bg-white p-6 shadow">
-        <h2 className="text-xl font-semibold text-gray-900">Quick Start</h2>
-        <p className="mt-2 text-sm text-gray-600">Get started with Aquivis in 3 easy steps</p>
-
-        <div className="mt-6 space-y-4">
-          <div className="flex items-start space-x-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white text-sm font-medium">
-              1
-            </div>
+      {/* Quick Start - Only show if not all steps complete */}
+      {(!hasProperties || !hasUnits || !hasServices) && (
+        <div className="mt-8 rounded-lg bg-white p-6 shadow">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-medium text-gray-900">Add Your First Property</h3>
-              <p className="text-sm text-gray-600">Start by adding a property you service</p>
-              <a href="/properties" className="mt-2 inline-block text-sm text-primary hover:text-primary-600">
-                Go to Properties →
-              </a>
+              <h2 className="text-xl font-semibold text-gray-900">Quick Start</h2>
+              <p className="mt-1 text-sm text-gray-600">Get started with Aquivis in 3 easy steps</p>
+            </div>
+            <div className="text-sm text-gray-600">
+              {[hasProperties, hasUnits, hasServices].filter(Boolean).length} of 3 complete
             </div>
           </div>
 
-          <div className="flex items-start space-x-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500 text-sm font-medium">
-              2
+          <div className="space-y-4">
+            {/* Step 1: Add Property */}
+            <div className="flex items-start space-x-4">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                hasProperties 
+                  ? 'bg-success text-white' 
+                  : 'bg-primary text-white'
+              }`}>
+                {hasProperties ? <Check className="h-5 w-5" /> : '1'}
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-medium ${hasProperties ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+                  Add Your First Property
+                </h3>
+                <p className={`text-sm ${hasProperties ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Start by adding a property you service
+                </p>
+                {!hasProperties && (
+                  <a href="/properties/new" className="mt-2 inline-block text-sm text-primary hover:text-primary-600">
+                    Add Property →
+                  </a>
+                )}
+              </div>
             </div>
-            <div>
-              <h3 className="font-medium text-gray-500">Add Pools/Units</h3>
-              <p className="text-sm text-gray-500">Add pools, spas, or units to your property</p>
-            </div>
-          </div>
 
-          <div className="flex items-start space-x-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500 text-sm font-medium">
-              3
+            {/* Step 2: Add Units */}
+            <div className="flex items-start space-x-4">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                hasUnits 
+                  ? 'bg-success text-white'
+                  : hasProperties
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-200 text-gray-500'
+              }`}>
+                {hasUnits ? <Check className="h-5 w-5" /> : '2'}
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-medium ${
+                  hasUnits 
+                    ? 'text-gray-500 line-through' 
+                    : hasProperties 
+                    ? 'text-gray-900' 
+                    : 'text-gray-500'
+                }`}>
+                  Add Pools/Units
+                </h3>
+                <p className={`text-sm ${hasUnits ? 'text-gray-400' : hasProperties ? 'text-gray-600' : 'text-gray-500'}`}>
+                  Add pools, spas, or units to your property
+                </p>
+                {hasProperties && !hasUnits && (
+                  <a href="/properties" className="mt-2 inline-block text-sm text-primary hover:text-primary-600">
+                    Go to Properties →
+                  </a>
+                )}
+              </div>
             </div>
-            <div>
-              <h3 className="font-medium text-gray-500">Start Servicing</h3>
-              <p className="text-sm text-gray-500">Log your first service and water test</p>
+
+            {/* Step 3: Log Service */}
+            <div className="flex items-start space-x-4">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                hasServices 
+                  ? 'bg-success text-white'
+                  : hasUnits
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-200 text-gray-500'
+              }`}>
+                {hasServices ? <Check className="h-5 w-5" /> : '3'}
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-medium ${
+                  hasServices 
+                    ? 'text-gray-500 line-through' 
+                    : hasUnits 
+                    ? 'text-gray-900' 
+                    : 'text-gray-500'
+                }`}>
+                  Log Your First Service
+                </h3>
+                <p className={`text-sm ${hasServices ? 'text-gray-400' : hasUnits ? 'text-gray-600' : 'text-gray-500'}`}>
+                  Record your first water test and service
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* System Info */}
       <div className="mt-8 rounded-lg border border-primary-200 bg-primary-50 p-6">
