@@ -110,9 +110,9 @@ export default async function DashboardPage() {
           </div>
           {!hasProperties && (
             <p className="mt-4 text-sm text-gray-600">
-              <a href="/properties/new" className="text-primary hover:text-primary-600">
+              <Link href="/properties/new" className="text-primary hover:text-primary-600">
                 Add your first property →
-              </a>
+              </Link>
             </p>
           )}
         </div>
@@ -144,9 +144,9 @@ export default async function DashboardPage() {
           </div>
           {profile?.role === 'owner' && (
             <p className="mt-4 text-sm text-gray-600">
-              <a href="/team" className="text-primary hover:text-primary-600">
+              <Link href="/team" className="text-primary hover:text-primary-600">
                 Invite team members →
-              </a>
+              </Link>
             </p>
           )}
         </div>

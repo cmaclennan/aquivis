@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 import { BarChart3, TrendingUp, Calendar, Filter, Download, X } from 'lucide-react'
 
 interface Service {
@@ -947,12 +948,12 @@ export default function ReportsClient() {
             Try adjusting your filters or start logging services to see your analytics.
           </p>
           <div className="mt-6">
-            <a
+            <Link
               href="/services/new-guided"
               className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-600"
             >
               Log Your First Service
-            </a>
+            </Link>
           </div>
         </div>
       )}
