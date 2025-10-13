@@ -240,6 +240,7 @@ npm run dev
 - **[docs/DATABASE_VALIDATION.md](./docs/DATABASE_VALIDATION.md)** - Schema validation
 
 ### **Deployment & Guides**
+- **[docs/VERCEL_DEPLOYMENT_SETUP.md](./docs/VERCEL_DEPLOYMENT_SETUP.md)** ⭐ - Vercel deployment setup (fixes build issues)
 - **[docs/DATABASE_DEPLOYMENT_GUIDE.md](./docs/DATABASE_DEPLOYMENT_GUIDE.md)** - How to deploy schema
 - **[docs/PRODUCTION_CHECKLIST.md](./docs/PRODUCTION_CHECKLIST.md)** - Pre-production checklist
 - **[docs/EMAIL_SETUP_GUIDE.md](./docs/EMAIL_SETUP_GUIDE.md)** - Email configuration
