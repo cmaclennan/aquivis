@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Droplets, Gauge, Beaker, Wrench, ClipboardList, Calendar } from 'lucide-react'
+import ServiceHistory from '@/components/ServiceHistory'
+import WaterQualityChart from '@/components/WaterQualityChart'
 
 export default async function UnitDetailPage({
   params,
@@ -41,6 +43,18 @@ export default async function UnitDetailPage({
     notFound()
   }
 
+  // Load current custom schedule if applicable
+  let customSchedule: any = null
+  if (unit.service_frequency === 'custom') {
+    const { data } = await supabase
+      .from('custom_schedules')
+      .select('schedule_type, schedule_config, service_types, name, description')
+      .eq('unit_id', unitId)
+      .eq('is_active', true)
+      .maybeSingle()
+    customSchedule = data
+  }
+
   // TODO: Get latest service and equipment count
   // For now, these are placeholders
   const latestService = null
@@ -74,12 +88,21 @@ export default async function UnitDetailPage({
               </div>
             </div>
           </div>
-          <Link
-            href={`/properties/${propertyId}/units/${unitId}/edit`}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Edit Unit
-          </Link>
+          <div className="flex space-x-3">
+            <Link
+              href={`/services/new-guided?unit=${unitId}`}
+              className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 transition-colors"
+            >
+              <Droplets className="h-4 w-4" />
+              <span>Add Service</span>
+            </Link>
+            <Link
+              href={`/properties/${propertyId}/units/${unitId}/edit`}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Edit Unit
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -220,6 +243,84 @@ export default async function UnitDetailPage({
             )}
           </div>
 
+          {/* Schedule Summary */}
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="mb-4 text-sm font-semibold text-gray-900">Current Schedule</h3>
+            <div className="text-sm text-gray-800">
+              <p className="mb-2">
+                <span className="font-medium">Service Frequency:</span>{' '}
+                {unit.service_frequency === 'custom' ? 'Custom' : (unit.service_frequency || 'Not set')}
+              </p>
+              {unit.service_frequency === 'custom' ? (
+                customSchedule ? (
+                  <div className="space-y-2">
+                    {customSchedule.name && (
+                      <p><span className="font-medium">Name:</span> {customSchedule.name}</p>
+                    )}
+                    <p>
+                      <span className="font-medium">Type:</span>{' '}
+                      {(customSchedule.schedule_type || 'complex').replace('_', ' ')}
+                    </p>
+                    {customSchedule.schedule_config?.occupancy_rules ? (
+                      <div className="text-gray-700">
+                        <p className="font-medium">Occupancy Rules</p>
+                        <ul className="list-disc pl-5 mt-1 space-y-1">
+                          {customSchedule.schedule_config.occupancy_rules.on_arrival && (
+                            <li>Service on arrival</li>
+                          )}
+                          {customSchedule.schedule_config.occupancy_rules.weekly_minimum && (
+                            <li>Weekly minimum on {customSchedule.schedule_config.occupancy_rules.weekly_day}</li>
+                          )}
+                          {customSchedule.schedule_config.occupancy_rules.biweekly_minimum && (
+                            <li>Bi-weekly minimum on {customSchedule.schedule_config.occupancy_rules.biweekly_day}</li>
+                          )}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="text-gray-700">
+                        <p className="font-medium">Frequencies</p>
+                        <ul className="list-disc pl-5 mt-1 space-y-1">
+                          {Array.isArray(customSchedule.schedule_config?.schedules)
+                            ? customSchedule.schedule_config.schedules.map((s: any, i: number) => (
+                                <li key={i}>
+                                  {s.name || s.frequency} — {s.time || 'time N/A'}
+                                </li>
+                              ))
+                            : Object.keys(customSchedule.service_types || {}).map((freq) => (
+                                <li key={freq}>{freq}</li>
+                              ))}
+                        </ul>
+                      </div>
+                    )}
+                    <div className="pt-3">
+                      <Link href={`/properties/${propertyId}/units/${unitId}/edit`} className="text-primary hover:text-primary-600">
+                        Manage Schedule →
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-gray-600">
+                    No custom schedule found.
+                    <div className="pt-3">
+                      <Link href={`/properties/${propertyId}/units/${unitId}/edit`} className="text-primary hover:text-primary-600">
+                        Set up schedule →
+                      </Link>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="text-gray-600">
+                  Using default frequency.
+                  <div className="pt-3">
+                    <Link href={`/properties/${propertyId}/units/${unitId}/edit`} className="text-primary hover:text-primary-600">
+                      Change schedule →
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Stats */}
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="mb-4 text-sm font-semibold text-gray-900">Statistics</h3>
@@ -243,6 +344,18 @@ export default async function UnitDetailPage({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Service History & Analytics */}
+      <div className="space-y-6">
+        {/* Service History */}
+        <ServiceHistory unitId={unitId} />
+        
+        {/* Water Quality Trends */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <WaterQualityChart unitId={unitId} parameter="ph" />
+          <WaterQualityChart unitId={unitId} parameter="chlorine" />
         </div>
       </div>
     </div>

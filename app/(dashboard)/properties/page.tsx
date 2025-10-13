@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Plus, Building2, MapPin } from 'lucide-react'
+import { formatLitresShort } from '@/lib/utils'
 import Link from 'next/link'
 
 export default async function PropertiesPage() {
@@ -19,7 +20,7 @@ export default async function PropertiesPage() {
     .from('properties')
     .select(`
       *,
-      units:units(count)
+      units:units(volume_litres)
     `)
     .eq('company_id', profile!.company_id)
     .order('name')
@@ -52,7 +53,7 @@ export default async function PropertiesPage() {
             <Link
               key={property.id}
               href={`/properties/${property.id}`}
-              className="group block rounded-lg border border-gray-200 bg-white p-6 shadow-sm hover:border-primary hover:shadow-md transition-all"
+              className="group block rounded-xl border border-[#bbc3c4] bg-white p-6 shadow-md hover:border-primary hover:shadow-lg transition-all"
             >
               {/* Property Icon & Name */}
               <div className="mb-4 flex items-start justify-between">
@@ -83,16 +84,20 @@ export default async function PropertiesPage() {
               <div className="flex items-center justify-between border-t border-gray-100 pt-4">
                 <div className="text-sm">
                   <span className="font-medium text-gray-900">
-                    {property.units?.[0]?.count || 0}
+                    {(property.units?.length) || 0}
                   </span>
                   <span className="text-gray-500"> units</span>
                 </div>
                 <div className="text-sm">
                   <span className="font-medium text-gray-900">
-                    {property.total_volume_litres 
-                      ? `${(property.total_volume_litres / 1000).toFixed(1)}k`
-                      : '0'
-                    }
+                    {(() => {
+                      const total = property.total_volume_litres ?? 0
+                      const summed = Array.isArray(property.units)
+                        ? property.units.reduce((acc: number, u: any) => acc + (u?.volume_litres || 0), 0)
+                        : 0
+                      const display = Math.max(total || 0, summed || 0)
+                      return formatLitresShort(display)
+                    })()}
                   </span>
                   <span className="text-gray-500"> L</span>
                 </div>

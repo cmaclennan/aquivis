@@ -12,30 +12,30 @@ const config: Config = {
       colors: {
         // Aquivis Brand Colors
         primary: {
-          DEFAULT: '#2090c3',
+          DEFAULT: '#1e91c4',
           50: '#e6f4fa',
-          100: '#cce9f5',
-          200: '#99d3eb',
-          300: '#66bde1',
-          400: '#33a7d7',
-          500: '#2090c3', // Main brand color
-          600: '#1a739c',
-          700: '#135675',
-          800: '#0d394e',
-          900: '#061c27',
+          100: '#cfeaf4',
+          200: '#a6d9ea',
+          300: '#7ec8e0',
+          400: '#55b6d6',
+          500: '#1e91c4',
+          600: '#1874a1',
+          700: '#125a7f',
+          800: '#0d405c',
+          900: '#072739',
         },
         accent: {
-          DEFAULT: '#bac2c3',
-          50: '#f5f6f6',
-          100: '#ebeded',
-          200: '#d7dbdb',
-          300: '#c3c9c9',
-          400: '#afb7b7',
-          500: '#bac2c3', // Subtle gray accent
-          600: '#959b9c',
-          700: '#707475',
-          800: '#4a4d4e',
-          900: '#252627',
+          DEFAULT: '#a8b2c1',
+          50: '#f6f8fb',
+          100: '#edf1f7',
+          200: '#d9dee9',
+          300: '#c4cbdc',
+          400: '#b0b9cf',
+          500: '#a8b2c1',
+          600: '#8a94a3',
+          700: '#6b7583',
+          800: '#4c5663',
+          900: '#2e3742',
         },
         // Functional colors
         success: {
@@ -64,6 +64,7 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        'primary-foreground': 'hsl(var(--primary-foreground))',
         popover: {
           DEFAULT: 'hsl(var(--popover))',
           foreground: 'hsl(var(--popover-foreground))',
@@ -95,6 +96,13 @@ const config: Config = {
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+      },
+      boxShadow: {
+        sm: '0 1px 2px 0 rgba(16, 24, 40, 0.05)',
+        DEFAULT: '0 1px 3px 0 rgba(16,24,40,0.1), 0 1px 2px -1px rgba(16,24,40,0.1)',
+        md: '0 2px 4px -2px rgba(16,24,40,0.1), 0 4px 8px -2px rgba(16,24,40,0.1)',
+        lg: '0 8px 16px -4px rgba(16,24,40,0.1)',
+        xl: '0 12px 24px -6px rgba(16,24,40,0.12)',
       },
     },
   },

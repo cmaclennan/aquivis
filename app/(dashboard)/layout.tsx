@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut } from 'lucide-react'
+import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut, Droplets, Settings, BarChart3, Calendar } from 'lucide-react'
 
 export default async function DashboardLayout({
   children,
@@ -28,9 +28,9 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen app-surface">
       {/* Sidebar */}
-      <aside className="flex w-64 flex-col bg-white border-r border-gray-200">
+      <aside className="flex w-64 flex-col bg-white/95 backdrop-blur border-r border-gray-300 shadow-lg z-10">
         {/* Logo & Company Name */}
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center space-x-3">
@@ -71,23 +71,49 @@ export default async function DashboardLayout({
             <UserCircle className="h-5 w-5" />
             <span>Customers</span>
           </a>
-          {profile.role === 'owner' && (
-            <>
-              <a
-                href="/reports"
-                className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <TrendingUp className="h-5 w-5" />
-                <span>Reports</span>
-              </a>
-              <a
-                href="/team"
-                className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <Users className="h-5 w-5" />
-                <span>Team</span>
-              </a>
-            </>
+          <a
+            href="/schedule"
+            className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <Calendar className="h-5 w-5" />
+            <span>Schedule</span>
+          </a>
+          <a
+            href="/management"
+            className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <BarChart3 className="h-5 w-5" />
+            <span>Management</span>
+          </a>
+          <a
+            href="/services"
+            className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <Droplets className="h-5 w-5" />
+            <span>Services</span>
+          </a>
+          <a
+            href="/jobs"
+            className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <TrendingUp className="h-5 w-5" />
+            <span>Jobs</span>
+          </a>
+          <a
+            href="/reports"
+            className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <BarChart3 className="h-5 w-5" />
+            <span>Reports</span>
+          </a>
+          {(profile.role === 'owner' || profile.role === 'manager') && (
+            <a
+              href="/settings"
+              className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <Settings className="h-5 w-5" />
+              <span>Settings</span>
+            </a>
           )}
         </nav>
 
@@ -95,12 +121,15 @@ export default async function DashboardLayout({
         <div className="p-3 border-t border-gray-100">
           <div className="rounded-lg bg-primary-50 p-3">
             <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
+              <a
+                href="/profile"
+                className="min-w-0 flex-1 hover:bg-primary-100 rounded p-1 -m-1 transition-colors"
+              >
                 <p className="font-medium text-primary-700 text-sm truncate">
                   {profile.first_name} {profile.last_name}
                 </p>
                 <p className="text-xs text-primary-600 capitalize truncate">{profile.role}</p>
-              </div>
+              </a>
               <a
                 href="/logout"
                 className="flex-shrink-0 ml-2 text-primary-600 hover:text-primary-700 transition-colors"

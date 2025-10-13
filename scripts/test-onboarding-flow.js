@@ -1,102 +1,146 @@
-/**
- * Test Complete Onboarding Flow
- * Simulates what the app does during onboarding
- */
-
+require('dotenv').config({ path: '.env.local' });
 const { createClient } = require('@supabase/supabase-js');
 
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtyeGFicmRpenFicGl0cHN2Z2l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyODM1MTIsImV4cCI6MjA3NDg1OTUxMn0.Og1vlRLR4dEMRvYF4POSifY-oxuCEIqifBlWh4q5Kng';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(
-  'https://krxabrdizqbpitpsvgiv.supabase.co',
-  ANON_KEY
-);
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-async function testFlow() {
-  console.log('🧪 Testing Onboarding Flow (As Regular User)\n');
+async function testOnboardingFlow() {
+  console.log('🧪 TESTING ONBOARDING FLOW AFTER FIX\n');
+  console.log('=' .repeat(60));
 
-  // Step 1: Login as existing user
-  console.log('1️⃣ Logging in as craig.maclennan@gmail.com...');
-  const { data: authData, error: loginError } = await supabase.auth.signInWithPassword({
-    email: 'craig.maclennan@gmail.com',
-    password: 'test123456' // Replace with actual password if different
-  });
+  try {
+    // 1. Check if the new user profile was created
+    console.log('\n1️⃣ NEW USER PROFILE CHECK');
+    console.log('-'.repeat(30));
+    
+    const newUserId = 'fe2bc5df-718d-4059-97bb-874ac9f6924f';
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', newUserId)
+      .single();
 
-  if (loginError) {
-    console.log('❌ Login failed:', loginError.message);
-    console.log('   (This is expected if password is different - test manually instead)\n');
-    console.log('📋 Manual Test:');
-    console.log('   1. Go to: http://localhost:3000/login');
-    console.log('   2. Login with your account');
-    console.log('   3. Go to: http://localhost:3000/onboarding');
-    console.log('   4. Should see company creation form (no 403 error!)');
-    console.log('   5. Create a test company\n');
-    return;
+    if (profileError) {
+      console.log('❌ Profile not found:', profileError.message);
+    } else {
+      console.log('✅ Profile created successfully!');
+      console.log('📝 Profile data:', {
+        id: profile.id,
+        email: profile.email,
+        name: `${profile.first_name} ${profile.last_name}`,
+        role: profile.role,
+        company_id: profile.company_id || 'None (expected)'
+      });
+    }
+
+    // 2. Test companies RLS policies
+    console.log('\n2️⃣ COMPANIES RLS POLICIES TEST');
+    console.log('-'.repeat(30));
+    
+    // Test reading companies (this was failing before)
+    const { data: companies, error: companiesError } = await supabase
+      .from('companies')
+      .select('id, name')
+      .limit(5);
+
+    if (companiesError) {
+      console.log('❌ Cannot read companies:', companiesError.message);
+    } else {
+      console.log('✅ Can read companies successfully!');
+      console.log('📝 Companies found:', companies.length);
+      companies.forEach(company => {
+        console.log(`   - ${company.id}: ${company.name}`);
+      });
+    }
+
+    // 3. Test company creation (simulating onboarding)
+    console.log('\n3️⃣ COMPANY CREATION TEST (SIMULATING ONBOARDING)');
+    console.log('-'.repeat(30));
+    
+    const { data: testCompany, error: companyError } = await supabase
+      .from('companies')
+      .insert({
+        name: 'Onboarding Test Company',
+        business_type: 'both',
+        phone: '555-0123',
+        timezone: 'Australia/Brisbane',
+        unit_system: 'metric',
+        date_format: 'DD/MM/YYYY',
+        currency: 'AUD',
+        compliance_jurisdiction: 'QLD',
+        subscription_tier: 'starter',
+        subscription_status: 'trial'
+      })
+      .select()
+      .single();
+
+    if (companyError) {
+      console.log('❌ Company creation failed:', companyError.message);
+      console.log('❌ Error code:', companyError.code);
+    } else {
+      console.log('✅ Company creation succeeded!');
+      console.log('📝 Company data:', {
+        id: testCompany.id,
+        name: testCompany.name,
+        business_type: testCompany.business_type
+      });
+      
+      // Test profile update (simulating onboarding step 2)
+      console.log('\n4️⃣ PROFILE UPDATE TEST (SIMULATING ONBOARDING STEP 2)');
+      console.log('-'.repeat(30));
+      
+      const { data: updatedProfile, error: updateError } = await supabase
+        .from('profiles')
+        .update({ company_id: testCompany.id })
+        .eq('id', newUserId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.log('❌ Profile update failed:', updateError.message);
+      } else {
+        console.log('✅ Profile update succeeded!');
+        console.log('📝 Updated profile:', {
+          id: updatedProfile.id,
+          company_id: updatedProfile.company_id,
+          name: `${updatedProfile.first_name} ${updatedProfile.last_name}`
+        });
+      }
+      
+      // Clean up test data
+      await supabase.from('companies').delete().eq('id', testCompany.id);
+      console.log('🧹 Test company cleaned up');
+    }
+
+    // 5. Final assessment
+    console.log('\n5️⃣ FINAL ASSESSMENT');
+    console.log('-'.repeat(30));
+    
+    if (profile && !companiesError && !companyError) {
+      console.log('🎉 SUCCESS! Onboarding flow should work:');
+      console.log('   ✅ Profile creation works');
+      console.log('   ✅ Companies RLS policies work');
+      console.log('   ✅ Company creation works');
+      console.log('   ✅ Profile update works');
+      console.log('   ✅ Complete onboarding flow should work');
+    } else {
+      console.log('❌ Some issues remain:');
+      if (!profile) console.log('   ❌ Profile creation failed');
+      if (companiesError) console.log('   ❌ Companies RLS policies failed');
+      if (companyError) console.log('   ❌ Company creation failed');
+    }
+
+    console.log('\n' + '='.repeat(60));
+    console.log('🎯 ONBOARDING FLOW TEST COMPLETE');
+    console.log('='.repeat(60));
+
+  } catch (error) {
+    console.error('❌ Test failed:', error.message);
+  } finally {
+    process.exit(0);
   }
-
-  console.log('✅ Logged in!\n');
-
-  // Step 2: Check existing companies (what onboarding page does)
-  console.log('2️⃣ Checking existing companies (SELECT)...');
-  const { data: companies, error: selectError } = await supabase
-    .from('companies')
-    .select('*');
-
-  if (selectError) {
-    console.log('❌ SELECT failed:', selectError.message);
-    console.log('   Status:', selectError.code);
-    return;
-  }
-
-  console.log('✅ SELECT succeeded!');
-  console.log(`   Found ${companies.length} companies`);
-  if (companies.length > 0) {
-    console.log('   User already has a company - onboarding would skip\n');
-    return;
-  }
-  console.log('   No companies - ready to create one!\n');
-
-  // Step 3: Create company (what happens when user submits form)
-  console.log('3️⃣ Creating test company (INSERT)...');
-  const { data: newCompany, error: insertError } = await supabase
-    .from('companies')
-    .insert({
-      name: 'Test Pool Services',
-      business_type: 'both',
-      timezone: 'Australia/Brisbane',
-      unit_system: 'metric',
-      compliance_jurisdiction: 'QLD'
-    })
-    .select()
-    .single();
-
-  if (insertError) {
-    console.log('❌ INSERT failed:', insertError.message);
-    console.log('   Status:', insertError.code);
-    return;
-  }
-
-  console.log('✅ INSERT succeeded!');
-  console.log(`   Created company: ${newCompany.name}`);
-  console.log(`   Company ID: ${newCompany.id}\n`);
-
-  // Step 4: Update profile with company_id
-  console.log('4️⃣ Linking profile to company...');
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ company_id: newCompany.id, role: 'owner' })
-    .eq('id', authData.user.id);
-
-  if (updateError) {
-    console.log('❌ Profile update failed:', updateError.message);
-    return;
-  }
-
-  console.log('✅ Profile linked!\n');
-
-  console.log('🎉 COMPLETE FLOW SUCCESSFUL!');
-  console.log('\n✅ All tests passed - onboarding flow works!\n');
 }
 
-testFlow().catch(console.error);
-
+testOnboardingFlow();

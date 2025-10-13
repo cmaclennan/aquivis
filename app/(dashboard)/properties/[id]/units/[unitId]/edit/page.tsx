@@ -3,8 +3,9 @@
 import { useState, useEffect, use } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Droplets, Hash, Gauge, Trash2 } from 'lucide-react'
+import { ArrowLeft, Droplets, Hash, Gauge, Trash2, Calendar as CalIcon } from 'lucide-react'
 import Link from 'next/link'
+import ScheduleBuilder from '@/components/scheduling/ScheduleBuilder'
 
 type UnitType = 'residential_pool' | 'main_pool' | 'kids_pool' | 'main_spa' | 'rooftop_spa' | 'plunge_pool' | 'villa_pool'
 type WaterType = 'saltwater' | 'freshwater' | 'bromine'
@@ -32,6 +33,9 @@ export default function EditUnitPage({
   const [billingEntity, setBillingEntity] = useState<'property' | 'unit_owner' | 'hotel' | 'body_corporate'>('property')
   const [customerId, setCustomerId] = useState<string>('')
   const [notes, setNotes] = useState('')
+  const [showScheduleBuilder, setShowScheduleBuilder] = useState(false)
+  const [hasBookings, setHasBookings] = useState(false)
+  const [customSchedule, setCustomSchedule] = useState<any>(null)
   const [oldVolume, setOldVolume] = useState<number | null>(null)
   
   const [loading, setLoading] = useState(true)
@@ -81,7 +85,7 @@ export default function EditUnitPage({
         // Load unit
         const { data: unit, error: unitError } = await supabase
           .from('units')
-          .select('*, property:properties!inner(company_id)')
+          .select('*, property:properties!inner(company_id), service_frequency')
           .eq('id', unitId)
           .eq('property_id', propertyId)
           .single()
@@ -99,6 +103,26 @@ export default function EditUnitPage({
         setCustomerId(unit.customer_id || '')
         setOldVolume(unit.volume_litres)
         setNotes(unit.notes || '')
+
+        // Detect if property/units use bookings (simple heuristic: any bookings exist for unit)
+        const { data: bookingExists } = await supabase
+          .from('bookings')
+          .select('id')
+          .eq('unit_id', unitId)
+          .limit(1)
+
+        setHasBookings(!!(bookingExists && bookingExists.length))
+
+        // Load existing custom schedule if service_frequency is custom
+        if (unit.service_frequency === 'custom') {
+          const { data: existingSchedule } = await supabase
+            .from('custom_schedules')
+            .select('schedule_type, schedule_config, service_types, name, description')
+            .eq('unit_id', unitId)
+            .eq('is_active', true)
+            .single()
+          if (existingSchedule) setCustomSchedule(existingSchedule)
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to load unit')
       } finally {
@@ -230,6 +254,15 @@ export default function EditUnitPage({
         <p className="mt-2 text-gray-600">
           Update details for this pool or spa at {propertyName}
         </p>
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setShowScheduleBuilder(true)}
+            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-600"
+          >
+            <CalIcon className="h-4 w-4 mr-2" /> Manage Schedule
+          </button>
+        </div>
       </div>
 
       {/* Form */}
@@ -439,6 +472,52 @@ export default function EditUnitPage({
           </div>
         </form>
       </div>
+
+      {/* Schedule Builder Modal */}
+      {showScheduleBuilder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <ScheduleBuilder
+              unitId={unitId}
+              propertyId={propertyId}
+              context="unit"
+              unitType={unitType}
+              hasBookings={hasBookings}
+              initialSchedule={customSchedule}
+              onCancel={() => setShowScheduleBuilder(false)}
+              onSave={async (schedule) => {
+                // Upsert custom schedule and mark unit as custom frequency
+                // Avoid onConflict for portability; do a delete+insert
+                await supabase
+                  .from('custom_schedules')
+                  .delete()
+                  .eq('unit_id', unitId)
+
+                const { error: upsertError } = await supabase
+                  .from('custom_schedules')
+                  .insert({
+                    unit_id: unitId,
+                    schedule_type: schedule.schedule_type,
+                    schedule_config: schedule.schedule_config,
+                    service_types: schedule.service_types,
+                    name: schedule.name,
+                    description: schedule.description,
+                    is_active: true
+                  })
+
+                if (!upsertError) {
+                  await supabase
+                    .from('units')
+                    .update({ service_frequency: 'custom' })
+                    .eq('id', unitId)
+                  setCustomSchedule(schedule)
+                  setShowScheduleBuilder(false)
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

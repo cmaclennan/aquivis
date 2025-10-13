@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -12,15 +12,31 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
   const router = useRouter()
+  const params = useSearchParams()
   const supabase = createClient()
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setDebugInfo(null)
+
+    // Capture detailed debug information
+    const debugData = {
+      timestamp: new Date().toISOString(),
+      email,
+      firstName,
+      lastName,
+      passwordLength: password.length,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      step: 'starting_signup'
+    }
 
     try {
+      console.log('🔍 SIGNUP DEBUG - Starting signup process:', debugData)
+      
       // Create auth user (trigger will auto-create profile)
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -33,20 +49,82 @@ export default function SignupPage() {
         }
       })
 
-      if (signUpError) throw signUpError
+      // Enhanced debug information
+      const enhancedDebug = {
+        ...debugData,
+        step: 'signup_response_received',
+        hasData: !!data,
+        hasError: !!signUpError,
+        userExists: !!data?.user,
+        userId: data?.user?.id,
+        userEmail: data?.user?.email,
+        userConfirmed: !!data?.user?.email_confirmed_at,
+        identitiesCount: data?.user?.identities?.length || 0,
+        errorMessage: signUpError?.message,
+        errorCode: signUpError?.code,
+        errorStatus: signUpError?.status,
+        errorDetails: signUpError?.details,
+        errorHint: signUpError?.hint
+      }
+
+      console.log('🔍 SIGNUP DEBUG - Response received:', enhancedDebug)
+      setDebugInfo(enhancedDebug)
+
+      if (signUpError) {
+        console.error('❌ SIGNUP DEBUG - Signup error:', signUpError)
+        throw signUpError
+      }
 
       if (data.user) {
+        console.log('✅ SIGNUP DEBUG - User created successfully:', data.user.id)
+        
         // Check if email confirmation is required
         if (data.user.identities && data.user.identities.length === 0) {
           // Email confirmation required
+          console.log('📧 SIGNUP DEBUG - Email confirmation required')
           setSuccess(true)
         } else {
           // No confirmation needed (or already confirmed)
-          // Profile is auto-created by database trigger
-          router.push('/onboarding')
+          console.log('✅ SIGNUP DEBUG - No confirmation needed, creating profile...')
+          
+          // Create profile manually since trigger has timing issues
+          const { data: profileResult, error: profileError } = await supabase
+            .rpc('ensure_user_profile', {
+              user_id: data.user.id,
+              user_email: data.user.email || email,
+              first_name: firstName,
+              last_name: lastName
+            })
+          
+          if (profileError) {
+            console.error('❌ SIGNUP DEBUG - Profile creation failed:', profileError)
+            setError('Failed to create user profile. Please try again.')
+          } else {
+            console.log('✅ SIGNUP DEBUG - Profile created successfully, redirecting to onboarding')
+            const redirect = params.get('redirect')
+            router.push(redirect || '/onboarding')
+          }
         }
+      } else {
+        console.log('⚠️ SIGNUP DEBUG - No user in response data')
       }
     } catch (err: any) {
+      console.error('❌ SIGNUP DEBUG - Exception caught:', err)
+      
+      const errorDebug = {
+        ...debugData,
+        step: 'exception_caught',
+        errorType: err.constructor.name,
+        errorMessage: err.message,
+        errorCode: err.code,
+        errorStatus: err.status,
+        errorDetails: err.details,
+        errorHint: err.hint,
+        errorStack: err.stack
+      }
+      
+      console.error('❌ SIGNUP DEBUG - Full error details:', errorDebug)
+      setDebugInfo(errorDebug)
       setError(err.message || 'Failed to create account')
     } finally {
       setLoading(false)
@@ -88,6 +166,15 @@ export default function SignupPage() {
           {error && (
             <div className="mb-4 rounded-lg bg-error-light p-3 text-sm text-error">
               {error}
+            </div>
+          )}
+
+          {debugInfo && (
+            <div className="mb-4 rounded-lg bg-gray-100 p-3 text-xs">
+              <h4 className="font-semibold mb-2">🔍 Debug Information:</h4>
+              <pre className="whitespace-pre-wrap text-xs overflow-auto max-h-40">
+                {JSON.stringify(debugInfo, null, 2)}
+              </pre>
             </div>
           )}
 

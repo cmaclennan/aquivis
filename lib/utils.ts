@@ -12,6 +12,13 @@ export function litresToGallons(litres: number): number {
   return Math.round(litres * 0.264172)
 }
 
+export function formatLitresShort(litres: number): string {
+  if (!litres || litres <= 0) return '0'
+  if (litres >= 1_000_000) return `${(litres / 1_000_000).toFixed(1)}M`
+  if (litres >= 1_000) return `${(litres / 1_000).toFixed(1)}k`
+  return `${Math.round(litres)}`
+}
+
 /**
  * Convert gallons to litres (for storage)
  */

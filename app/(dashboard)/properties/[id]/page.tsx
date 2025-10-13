@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Building2, MapPin, Phone, Mail, User, Plus, Droplets } from 'lucide-react'
+import { ArrowLeft, Building2, MapPin, Phone, Mail, User, Plus, Droplets, Calendar } from 'lucide-react'
+import { formatLitresShort } from '@/lib/utils'
 
 export default async function PropertyDetailPage({
   params,
@@ -37,24 +38,59 @@ export default async function PropertyDetailPage({
     notFound()
   }
 
+  // Get current bookings for this property (only if it has individual units)
+  let currentBookings = null
+  if (property.has_individual_units) {
+    const today = new Date().toISOString().split('T')[0]
+    const { data } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        unit:units!inner(name, unit_type, property_id)
+      `)
+      .eq('unit.property_id', propertyId)
+      .lte('check_in_date', today)
+      .gte('check_out_date', today)
+      .order('check_in_date', { ascending: true })
+    currentBookings = data
+  }
+
   const units = property.units || []
   const hasUnits = units.length > 0
   const hasIndividualUnits = property.has_individual_units || false
+  const computedTotalVolume = units.reduce((sum: number, u: any) => sum + (u?.volume_litres || 0), 0)
+  const totalVolumeLitres = property.total_volume_litres ?? 0
+  const displayTotalLitres = Math.max(totalVolumeLitres || 0, computedTotalVolume || 0)
+  
+  // Equipment count summary
+  const { count: equipmentCount } = await supabase
+    .from('equipment')
+    .select('*', { count: 'exact', head: true })
+    .eq('property_id', propertyId)
+    .eq('is_active', true)
+  // Top equipment list
+  const { data: equipmentTop } = await supabase
+    .from('equipment')
+    .select('id, name, category')
+    .eq('property_id', propertyId)
+    .eq('is_active', true)
+    .order('name')
+    .limit(5)
   
   // Separate shared facilities from individual units based on unit_type
-  // Shared: main_pool, kids_pool, main_spa, rooftop_spa (property-level)
-  // Individual: plunge_pool, villa_pool, villa_spa, unit_spa (customer-owned)
+  // Shared: residential_pool, main_pool, kids_pool, main_spa (property-level)
+  // Individual: rooftop_spa, plunge_pool, villa_pool (customer-owned)
   const sharedFacilities = units.filter(u => 
+    u.unit_type === 'residential_pool' || 
     u.unit_type === 'main_pool' || 
     u.unit_type === 'kids_pool' || 
-    u.unit_type === 'main_spa' || 
-    u.unit_type === 'rooftop_spa'
+    u.unit_type === 'main_spa' ||
+    u.unit_type === 'splash_park'
   )
   const individualUnits = units.filter(u => 
+    u.unit_type === 'rooftop_spa' || 
     u.unit_type === 'plunge_pool' || 
-    u.unit_type === 'villa_pool' || 
-    u.unit_type === 'villa_spa' || 
-    u.unit_type === 'unit_spa'
+    u.unit_type === 'villa_pool'
   )
   const hasSharedFacilities = sharedFacilities.length > 0
   const hasIndividualUnitsList = individualUnits.length > 0
@@ -78,12 +114,35 @@ export default async function PropertyDetailPage({
               {property.property_type.replace('_', ' ')}
             </p>
           </div>
-          <Link
-            href={`/properties/${propertyId}/edit`}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Edit Property
-          </Link>
+          <div className="flex items-center space-x-3">
+            {hasIndividualUnits && (
+              <Link
+                href={`/properties/${propertyId}/bookings`}
+                className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 transition-colors"
+              >
+                <Calendar className="h-4 w-4" />
+                <span>Manage Bookings</span>
+              </Link>
+            )}
+            <Link
+              href={`/properties/${propertyId}/plant-rooms`}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Plant Rooms
+            </Link>
+            <Link
+              href={`/properties/${propertyId}/scheduling`}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Scheduling Rules
+            </Link>
+            <Link
+              href={`/properties/${propertyId}/edit`}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Edit Property
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -158,14 +217,15 @@ export default async function PropertyDetailPage({
               <p className="text-sm text-gray-600">Total Units</p>
               <p className="text-2xl font-bold text-gray-900">{units.length}</p>
             </div>
+            <div>
+              <p className="text-sm text-gray-600">Equipment</p>
+              <p className="text-2xl font-bold text-gray-900">{equipmentCount ?? 0}</p>
+            </div>
             
             <div>
               <p className="text-sm text-gray-600">Total Volume</p>
               <p className="text-2xl font-bold text-gray-900">
-                {property.total_volume_litres 
-                  ? `${(property.total_volume_litres / 1000).toFixed(1)}k L`
-                  : '0 L'
-                }
+                {displayTotalLitres > 0 ? `${formatLitresShort(displayTotalLitres)} L` : '0 L'}
               </p>
             </div>
 
@@ -175,9 +235,76 @@ export default async function PropertyDetailPage({
                 {new Date(property.updated_at).toLocaleDateString('en-AU')}
               </p>
             </div>
+
+            {equipmentTop && equipmentTop.length > 0 && (
+              <div className="pt-4 border-t border-gray-200">
+                <p className="text-sm font-medium text-gray-900 mb-2">Top Equipment</p>
+                <ul className="space-y-1">
+                  {equipmentTop.map((e: any) => (
+                    <li key={e.id} className="text-sm text-gray-700">
+                      {e.name}
+                      {e.category ? <span className="text-gray-500"> • {e.category}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 flex items-center gap-3">
+                  <Link href={`/properties/${propertyId}/plant-rooms`} className="text-sm text-primary hover:text-primary-600">Manage Plant Rooms →</Link>
+                  <Link href="/reports" className="text-sm text-gray-700 hover:text-gray-900">Reports (Equipment CSV) →</Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Current Bookings Section - Only for properties with individual units */}
+      {hasIndividualUnits && currentBookings && currentBookings.length > 0 && (
+        <div className="mb-8 rounded-lg bg-white p-6 shadow">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Current Bookings</h2>
+              <p className="text-sm text-gray-600">Units occupied today</p>
+            </div>
+            <Link
+              href={`/properties/${propertyId}/bookings`}
+              className="text-sm text-primary hover:text-primary-600"
+            >
+              View All Bookings →
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {currentBookings.slice(0, 6).map((booking: any) => (
+              <div key={booking.id} className="rounded-lg border border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-gray-900">
+                      {booking.unit?.name || 'Unknown Unit'}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Until {new Date(booking.check_out_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+                    <Calendar className="h-4 w-4 text-green-600" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {currentBookings.length > 6 && (
+            <div className="mt-4 text-center">
+              <Link
+                href={`/properties/${propertyId}/bookings`}
+                className="text-sm text-primary hover:text-primary-600"
+              >
+                View {currentBookings.length - 6} more bookings →
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Property Pools & Spas Section - ALWAYS SHOWN */}
       <div className={`rounded-lg bg-white p-6 shadow ${hasIndividualUnits ? 'mb-8' : ''}`}>
@@ -187,11 +314,11 @@ export default async function PropertyDetailPage({
             <p className="text-sm text-gray-600">Shared facilities for this property</p>
           </div>
           <Link
-            href={`/properties/${propertyId}/units/new`}
+            href={`/properties/${propertyId}/shared-facilities/new`}
             className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 transition-colors"
           >
             <Plus className="h-5 w-5" />
-            <span>Add Pool/Spa</span>
+            <span>Add Shared Facility</span>
           </Link>
         </div>
 
@@ -253,11 +380,11 @@ export default async function PropertyDetailPage({
               <p className="text-sm text-gray-600">Private pools/spas owned by individual customers (villas, condos, etc.)</p>
             </div>
             <Link
-              href={`/properties/${propertyId}/units/new`}
+              href={`/properties/${propertyId}/individual-units/new`}
               className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 transition-colors"
             >
               <Plus className="h-5 w-5" />
-              <span>Add Unit</span>
+              <span>Add Individual Unit</span>
             </Link>
           </div>
 

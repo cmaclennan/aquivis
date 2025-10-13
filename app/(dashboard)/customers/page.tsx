@@ -53,7 +53,7 @@ export default async function CustomersPage() {
             <Link
               key={customer.id}
               href={`/customers/${customer.id}`}
-              className="group block rounded-lg border border-gray-200 bg-white p-6 shadow-sm hover:border-primary hover:shadow-md transition-all"
+              className="group block rounded-xl border border-[#bbc3c4] bg-white p-6 shadow-md hover:border-primary hover:shadow-lg transition-all"
             >
               {/* Customer Icon & Name */}
               <div className="mb-4 flex items-start justify-between">

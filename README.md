@@ -48,6 +48,14 @@ This platform is built to handle:
 
 **Why this stack?** See [DECISIONS.md](./DECISIONS.md) for detailed rationale.
 
+**Business Logic:** See [BUSINESS_LOGIC_UNITS_VS_POOLS.md](./docs/BUSINESS_LOGIC_UNITS_VS_POOLS.md) for property/unit management logic.
+
+---
+
+## ✅ Attribution
+
+This application was designed and built by CODEFORGE 3D for Aquivis. No third-party boilerplates or prior app codebases (e.g., “lovable”, “base44”) were used.
+
 ---
 
 ## 📋 Project Status
@@ -63,10 +71,15 @@ This platform is built to handle:
 - [x] Authentication implemented (Supabase Auth + RLS)
 - [x] Property management (list, create, detail pages)
 - [x] Pool/Spa management (add, view units)
+- [x] Customer management (CRUD operations)
+- [x] Service management (water testing with QLD compliance)
+- [x] QLD Health compliance validation (real-time)
+- [x] Chemical recommendations with dosages
 - [x] Dashboard with progress tracking
-- [ ] Service forms (water testing)
-- [ ] Run sheets (daily schedules)
+- [ ] Service history & trends
 - [ ] Equipment tracking
+- [ ] Booking system (occupancy-based scheduling)
+- [ ] Run sheets (daily schedules)
 - [ ] Billing & reports
 
 ---
@@ -187,17 +200,20 @@ npm run dev
 
 ## 🎯 Core Features
 
-### Phase 1: Foundation (Weeks 1-4)
-- [ ] Authentication & user management
-- [ ] Property & unit management
-- [ ] Basic service logging
-- [ ] Water testing forms
+### Phase 1: Foundation (Weeks 1-4) ✅ COMPLETE
+- [x] Authentication & user management
+- [x] Property & unit management
+- [x] Customer management
+- [x] Service management with water testing
+- [x] QLD Health compliance validation
 
 ### Phase 2: Advanced Features (Weeks 5-8)
+- [x] Scheduling rules (incl. specific days, occupancy, random de-dup)
+- [x] Equipment & plant room checks (measurement_config-driven)
+- [x] Jobs (one-off/existing customer) and CSV export integration
 - [ ] Booking system (occupancy-based scheduling)
-- [ ] Run sheet generation
-- [ ] Equipment & plant room checks
-- [ ] Billing reports
+- [ ] Run sheet generation polish
+- [ ] Billing reports (full PDFs)
 
 ### Phase 3: Polish & Deploy (Weeks 9-12)
 - [ ] Mobile PWA optimization
@@ -256,7 +272,17 @@ npm run dev
 - **Staging:** Vercel preview branches
 - **Production:** Vercel main branch
 
-*Deployment instructions will be added during Phase 3*
+Apply these DB updates if not already applied:
+
+```sql
+alter table if exists equipment
+  add column if not exists maintenance_scheduled boolean not null default false;
+
+alter table if exists equipment
+  alter column maintenance_frequency drop default;
+```
+
+Then follow `docs/PRODUCTION_CHECKLIST.md` to enable email confirmation, configure SMTP, and replace dev RLS with production policies.
 
 ---
 
@@ -282,7 +308,7 @@ Proprietary - All rights reserved
 
 **Developer:** Craig MacLennan  
 **Project Start:** January 10, 2025  
-**Current Sprint:** Core Features (Property & Unit Management)  
+**Current Sprint:** Advanced Features (Service History & Equipment Tracking)  
 **Target Launch:** ~12 weeks (April 2025)
 
 ---

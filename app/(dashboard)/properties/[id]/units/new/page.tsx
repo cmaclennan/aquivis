@@ -3,7 +3,8 @@
 import { useState, useEffect, use } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Droplets, Hash, Gauge } from 'lucide-react'
+import { ArrowLeft, Droplets, Hash, Gauge, Calendar as CalIcon } from 'lucide-react'
+import ScheduleBuilder from '@/components/scheduling/ScheduleBuilder'
 import Link from 'next/link'
 
 type UnitType = 'residential_pool' | 'main_pool' | 'kids_pool' | 'main_spa' | 'rooftop_spa' | 'plunge_pool' | 'villa_pool'
@@ -26,12 +27,14 @@ export default function NewUnitPage({
   // Form state
   const [unitNumber, setUnitNumber] = useState('')
   const [name, setName] = useState('')
-  const [unitType, setUnitType] = useState<UnitType>('residential_pool')
+const [unitType, setUnitType] = useState<UnitType>('residential_pool')
   const [waterType, setWaterType] = useState<WaterType>('saltwater')
   const [volumeLitres, setVolumeLitres] = useState('')
   const [billingEntity, setBillingEntity] = useState<'property' | 'unit_owner' | 'hotel' | 'body_corporate'>('property')
   const [customerId, setCustomerId] = useState<string>('')
   const [notes, setNotes] = useState('')
+  const [showScheduleBuilder, setShowScheduleBuilder] = useState(false)
+  const [pendingSchedule, setPendingSchedule] = useState<any | null>(null)
   
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -133,6 +136,25 @@ export default function NewUnitPage({
           .from('properties')
           .update({ total_volume_litres: newTotal })
           .eq('id', propertyId)
+      }
+
+      // If a pending custom schedule exists, save it now and set unit to custom
+      if (pendingSchedule) {
+        await supabase
+          .from('custom_schedules')
+          .insert({
+            unit_id: unit.id,
+            schedule_type: pendingSchedule.schedule_type,
+            schedule_config: pendingSchedule.schedule_config,
+            service_types: pendingSchedule.service_types,
+            name: pendingSchedule.name,
+            description: pendingSchedule.description,
+            is_active: true
+          })
+        await supabase
+          .from('units')
+          .update({ service_frequency: 'custom' })
+          .eq('id', unit.id)
       }
 
       // Success - redirect to unit detail page
@@ -347,6 +369,13 @@ export default function NewUnitPage({
               Cancel
             </Link>
             <button
+              type="button"
+              onClick={() => setShowScheduleBuilder(true)}
+              className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-600"
+            >
+              <CalIcon className="h-4 w-4 mr-2" /> Configure Custom Schedule
+            </button>
+            <button
               type="submit"
               disabled={loading}
               className="rounded-lg bg-primary px-6 py-2 text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -356,6 +385,24 @@ export default function NewUnitPage({
           </div>
         </form>
       </div>
+      {/* Schedule Builder Modal */}
+      {showScheduleBuilder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <ScheduleBuilder
+              propertyId={propertyId}
+              context="unit"
+              unitType={unitType}
+              hasBookings={false}
+              onCancel={() => setShowScheduleBuilder(false)}
+              onSave={(schedule) => {
+                setPendingSchedule(schedule)
+                setShowScheduleBuilder(false)
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

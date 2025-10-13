@@ -32,7 +32,7 @@ export default function Home() {
             Get Started
           </a>
           <a
-            href="/customer-portal"
+            href="/customer-portal/login"
             className="px-6 py-3 bg-white border-2 border-primary text-primary rounded-lg hover:bg-primary-50 transition-colors"
           >
             Customer Portal

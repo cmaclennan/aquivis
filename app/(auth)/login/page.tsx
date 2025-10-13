@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const params = useSearchParams()
   const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -35,10 +36,12 @@ export default function LoginPage() {
 
         if (!profile) {
           // New user - need to create company
-          router.push('/onboarding')
+          const redirect = params.get('redirect')
+          router.push(redirect || '/onboarding')
         } else {
           // Existing user - go to dashboard
-          router.push('/dashboard')
+          const redirect = params.get('redirect')
+          router.push(redirect || '/dashboard')
         }
       }
     } catch (err: any) {
@@ -65,7 +68,7 @@ export default function LoginPage() {
         </div>
 
         {/* Login Form */}
-        <div className="rounded-lg bg-white p-8 shadow-lg">
+        <div className="rounded-xl bg-white p-8 shadow-md border border-gray-200">
           <h2 className="mb-6 text-2xl font-semibold text-gray-900">Sign In</h2>
 
           {error && (
@@ -122,8 +125,14 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-4 text-center">
-            <a href="/customer-portal" className="text-sm text-gray-600 hover:text-primary">
+            <a href="/customer-portal/login" className="text-sm text-gray-600 hover:text-primary">
               Customer Portal →
+            </a>
+          </div>
+          
+          <div className="mt-2 text-center">
+            <a href="/super-admin-login" className="text-xs text-gray-400 hover:text-gray-600">
+              Admin Access
             </a>
           </div>
         </div>
