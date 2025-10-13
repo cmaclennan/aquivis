@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut, Droplets, Settings, BarChart3, Calendar } from 'lucide-react'
 
 export default async function DashboardLayout({
@@ -50,70 +51,70 @@ export default async function DashboardLayout({
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <a
+          <Link
             href="/dashboard"
             className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
           >
             <LayoutDashboard className="h-5 w-5" />
             <span>Dashboard</span>
-          </a>
-          <a
+          </Link>
+          <Link
             href="/properties"
             className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
           >
             <Building2 className="h-5 w-5" />
             <span>Properties</span>
-          </a>
-          <a
+          </Link>
+          <Link
             href="/customers"
             className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
           >
             <UserCircle className="h-5 w-5" />
             <span>Customers</span>
-          </a>
-          <a
+          </Link>
+          <Link
             href="/schedule"
             className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
           >
             <Calendar className="h-5 w-5" />
             <span>Schedule</span>
-          </a>
-          <a
+          </Link>
+          <Link
             href="/management"
             className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
           >
             <BarChart3 className="h-5 w-5" />
             <span>Management</span>
-          </a>
-          <a
+          </Link>
+          <Link
             href="/services"
             className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
           >
             <Droplets className="h-5 w-5" />
             <span>Services</span>
-          </a>
-          <a
+          </Link>
+          <Link
             href="/jobs"
             className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
           >
             <TrendingUp className="h-5 w-5" />
             <span>Jobs</span>
-          </a>
-          <a
+          </Link>
+          <Link
             href="/reports"
             className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
           >
             <BarChart3 className="h-5 w-5" />
             <span>Reports</span>
-          </a>
+          </Link>
           {(profile.role === 'owner' || profile.role === 'manager') && (
-            <a
+            <Link
               href="/settings"
               className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <Settings className="h-5 w-5" />
               <span>Settings</span>
-            </a>
+            </Link>
           )}
         </nav>
 
