@@ -2,77 +2,132 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Only run middleware on specific routes that need authentication
+  const protectedRoutes = [
+    '/dashboard',
+    '/properties',
+    '/services',
+    '/reports', 
+    '/billing',
+    '/team',
+    '/onboarding',
+    '/management',
+    '/super-admin',
+    '/templates',
+    '/schedule',
+    '/jobs',
+    '/equipment',
+    '/profile',
+    '/settings'
+  ]
+
+  const authRoutes = ['/login', '/signup']
+
+  // Check if this is a route that needs middleware
+  const needsAuth = protectedRoutes.some(route => pathname.startsWith(route))
+  const isAuthRoute = authRoutes.includes(pathname)
+
+  // If no middleware needed, return immediately
+  if (!needsAuth && !isAuthRoute) {
+    return NextResponse.next()
+  }
+
+  // Check environment variables first
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Supabase environment variables not configured')
+    // For protected routes, redirect to login on missing env vars
+    if (needsAuth) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    return NextResponse.next()
+  }
+
+  // Create response object
   let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   })
 
-  // Skip middleware for static files and API routes
-  if (request.nextUrl.pathname.startsWith('/_next') || 
-      request.nextUrl.pathname.startsWith('/api') ||
-      request.nextUrl.pathname.includes('.')) {
-    return response
-  }
-
-  // Check if Supabase environment variables are available
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    console.error('Supabase environment variables not configured')
-    return response
-  }
-
   try {
+    // Create Supabase client with error handling
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           getAll() {
-            return request.cookies.getAll()
+            try {
+              return request.cookies.getAll()
+            } catch (error) {
+              console.error('Error getting cookies:', error)
+              return []
+            }
           },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-            response = NextResponse.next({
-              request,
-            })
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options)
-            )
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => {
+                request.cookies.set(name, value)
+              })
+              response = NextResponse.next({
+                request,
+              })
+              cookiesToSet.forEach(({ name, value, options }) => {
+                response.cookies.set(name, value, options)
+              })
+            } catch (error) {
+              console.error('Error setting cookies:', error)
+            }
           },
         },
       }
     )
 
-    // Only check authentication for protected routes
-    const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') || 
-                            request.nextUrl.pathname.startsWith('/properties') ||
-                            request.nextUrl.pathname.startsWith('/service') ||
-                            request.nextUrl.pathname.startsWith('/reports') ||
-                            request.nextUrl.pathname.startsWith('/billing') ||
-                            request.nextUrl.pathname.startsWith('/team') ||
-                            request.nextUrl.pathname.startsWith('/onboarding')
+    // Get user with timeout and error handling
+    const getUserPromise = supabase.auth.getUser()
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Auth timeout')), 5000) // 5 second timeout
+    })
 
-    const isAuthRoute = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup'
+    const { data: { user }, error: authError } = await Promise.race([
+      getUserPromise,
+      timeoutPromise
+    ]) as any
 
-    if (isProtectedRoute || isAuthRoute) {
-      // Refresh session if expired
-      const { data: { user } } = await supabase.auth.getUser()
-
-      // Protected routes require authentication
-      if (isProtectedRoute && !user) {
+    if (authError) {
+      console.error('Auth error:', authError)
+      // For protected routes, redirect to login on auth error
+      if (needsAuth) {
         return NextResponse.redirect(new URL('/login', request.url))
       }
+      return NextResponse.next()
+    }
 
-      // Redirect authenticated users from login/signup
-      if (isAuthRoute && user) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
-      }
+    // Protected routes require authentication
+    if (needsAuth && !user) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+
+    // Redirect authenticated users from login/signup
+    if (isAuthRoute && user) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
   } catch (error) {
     console.error('Middleware error:', error)
-    // Don't fail the request, just continue without auth checks
-    return response
+    
+    // For protected routes, redirect to login on any error
+    if (needsAuth) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    
+    // For auth routes, just continue
+    return NextResponse.next()
   }
 
   return response
@@ -80,15 +135,23 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (images, etc.)
-     * - api routes (handled separately)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Only run on specific routes that need authentication
+    '/dashboard/:path*',
+    '/properties/:path*', 
+    '/services/:path*',
+    '/reports/:path*',
+    '/billing/:path*',
+    '/team/:path*',
+    '/onboarding/:path*',
+    '/management/:path*',
+    '/super-admin/:path*',
+    '/templates/:path*',
+    '/schedule/:path*',
+    '/jobs/:path*',
+    '/equipment/:path*',
+    '/profile/:path*',
+    '/settings/:path*',
+    '/login',
+    '/signup'
   ],
 }
-
