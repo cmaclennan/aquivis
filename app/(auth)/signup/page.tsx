@@ -62,8 +62,7 @@ export default function SignupPage() {
         identitiesCount: data?.user?.identities?.length || 0,
         errorMessage: signUpError?.message,
         errorCode: signUpError?.code,
-        errorStatus: signUpError?.status,
-        errorHint: signUpError?.hint
+        errorStatus: signUpError?.status
       }
 
       console.log('🔍 SIGNUP DEBUG - Response received:', enhancedDebug)
