@@ -248,6 +248,7 @@ npm run dev
 ### **Code Quality & Maintenance**
 - **[docs/ESLINT_FIXES_COMPLETE.md](./docs/ESLINT_FIXES_COMPLETE.md)** - Complete ESLint warning resolution
 - **[docs/ESLINT_QUICK_REFERENCE.md](./docs/ESLINT_QUICK_REFERENCE.md)** - Quick reference for avoiding ESLint issues
+- **[docs/MIDDLEWARE_500_ERROR_FIX.md](./docs/MIDDLEWARE_500_ERROR_FIX.md)** - Middleware 500 error resolution
 
 **See `/docs/README.md` for complete documentation index.**
 
