@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Shield, Building2, Users, Activity, LogOut, ChevronDown } from 'lucide-react'
 
@@ -24,13 +24,9 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const [error, setError] = useState<string | null>(null)
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    loadCompanies()
-  }, [])
-
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     try {
       setLoading(true)
       const { data, error } = await supabase.rpc('get_all_companies')
@@ -48,7 +44,11 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, selectedCompany])
+
+  useEffect(() => {
+    loadCompanies()
+  }, [loadCompanies])
 
   const handleCompanySelect = (company: Company) => {
     setSelectedCompany(company)

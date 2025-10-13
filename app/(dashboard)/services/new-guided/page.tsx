@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ArrowRight, CheckCircle, Clock, Droplets } from 'lucide-react'
@@ -85,7 +85,7 @@ const STEPS = [
 export default function NewGuidedServicePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   // Current step (1-6)
   const [currentStep, setCurrentStep] = useState(1)
@@ -109,26 +109,7 @@ export default function NewGuidedServicePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-    
-    // Check for unit parameter in URL
-    const unitParam = searchParams.get('unitId') || searchParams.get('unit')
-    const serviceTypeParam = searchParams.get('serviceType')
-    
-    if (unitParam) {
-      loadUnit(unitParam)
-    }
-    
-    if (serviceTypeParam) {
-      setServiceData(prev => ({
-        ...prev,
-        serviceType: serviceTypeParam
-      }))
-    }
-  }, [searchParams])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -166,13 +147,18 @@ export default function NewGuidedServicePage() {
         .order('name')
 
       if (unitsError) throw unitsError
-      setUnits(unitsData || [])
+      // Normalize join arrays to single objects where necessary
+      const normalized: Unit[] = (unitsData || []).map((u: any) => ({
+        ...u,
+        property: Array.isArray(u.property) ? u.property[0] : u.property,
+      }))
+      setUnits(normalized)
     } catch (err: any) {
       setError(err.message)
     }
-  }
+  }, [supabase])
 
-  const loadUnit = async (unitId: string) => {
+  const loadUnit = useCallback(async (unitId: string) => {
     try {
       const { data: unitData, error: unitError } = await supabase
         .from('units')
@@ -187,11 +173,30 @@ export default function NewGuidedServicePage() {
         .single()
 
       if (unitError) throw unitError
-      setUnit(unitData)
+      setUnit(unitData ? { ...unitData, property: Array.isArray(unitData.property) ? unitData.property[0] : unitData.property } : null)
     } catch (err: any) {
       setError(err.message)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    loadData()
+    
+    // Check for unit parameter in URL
+    const unitParam = searchParams.get('unitId') || searchParams.get('unit')
+    const serviceTypeParam = searchParams.get('serviceType')
+    
+    if (unitParam) {
+      loadUnit(unitParam)
+    }
+    
+    if (serviceTypeParam) {
+      setServiceData(prev => ({
+        ...prev,
+        serviceType: serviceTypeParam
+      }))
+    }
+  }, [searchParams, loadUnit, loadData])
 
   const updateServiceData = (updates: Partial<ServiceData>) => {
     setServiceData(prev => ({ ...prev, ...updates }))
@@ -228,7 +233,7 @@ export default function NewGuidedServicePage() {
     }
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -262,9 +267,10 @@ export default function NewGuidedServicePage() {
       if (serviceError) throw serviceError
 
       // Create water test if data provided
-      const hasWaterTest = Object.values(serviceData.waterTestData).some(value => 
-        value !== undefined && value !== null && value !== ''
-      )
+      const hasWaterTest = Object.values(serviceData.waterTestData).some((value: any) => {
+        if (typeof value === 'boolean') return value === true
+        return value !== undefined && value !== null && value !== ''
+      })
       
       if (hasWaterTest) {
         const { error: waterTestError } = await supabase
@@ -305,7 +311,11 @@ export default function NewGuidedServicePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, router, serviceData.chemicalAdditions, serviceData.notes, serviceData.serviceDate, serviceData.serviceType, serviceData.technicianId, serviceData.waterTestData, unit?.id, unit?.property.id])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   if (!unit) {
     return (

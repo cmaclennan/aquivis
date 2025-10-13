@@ -73,10 +73,10 @@ export default function Step2WaterTest({ serviceData, updateServiceData, unit }:
             ph: localData.ph ? parseFloat(localData.ph) : undefined,
             chlorine: localData.chlorine ? parseFloat(localData.chlorine) : undefined,
             bromine: localData.bromine ? parseFloat(localData.bromine) : undefined,
-            salt: localData.salt ? parseInt(localData.salt) : undefined,
-            alkalinity: localData.alkalinity ? parseInt(localData.alkalinity) : undefined,
-            calcium: localData.calcium ? parseInt(localData.calcium) : undefined,
-            cyanuric: localData.cyanuric ? parseInt(localData.cyanuric) : undefined
+            salt: localData.salt ? parseInt(localData.salt, 10) : undefined,
+            alkalinity: localData.alkalinity ? parseInt(localData.alkalinity, 10) : undefined,
+            calcium: localData.calcium ? parseInt(localData.calcium, 10) : undefined,
+            cyanuric: localData.cyanuric ? parseInt(localData.cyanuric, 10) : undefined
           },
           unit.unit_type,
           unit.water_type
@@ -151,7 +151,7 @@ export default function Step2WaterTest({ serviceData, updateServiceData, unit }:
                   placeholder="7.4"
                 />
                 <ParameterValidator
-                  value={localData.ph}
+                  value={typeof localData.ph === 'string' ? parseFloat(localData.ph) : localData.ph}
                   parameter="ph"
                   unitType={unit.unit_type}
                   waterType={unit.water_type}
@@ -175,7 +175,7 @@ export default function Step2WaterTest({ serviceData, updateServiceData, unit }:
                   placeholder="3.0"
                 />
                 <ParameterValidator
-                  value={localData.chlorine}
+                  value={typeof localData.chlorine === 'string' ? parseFloat(localData.chlorine) : localData.chlorine}
                   parameter="chlorine"
                   unitType={unit.unit_type}
                   waterType={unit.water_type}
@@ -199,7 +199,7 @@ export default function Step2WaterTest({ serviceData, updateServiceData, unit }:
                     placeholder="3000"
                   />
                   <ParameterValidator
-                    value={localData.salt}
+                    value={typeof localData.salt === 'string' ? parseFloat(localData.salt) : localData.salt}
                     parameter="salt"
                     unitType={unit.unit_type}
                     waterType={unit.water_type}
@@ -223,7 +223,7 @@ export default function Step2WaterTest({ serviceData, updateServiceData, unit }:
                   placeholder="120"
                 />
                 <ParameterValidator
-                  value={localData.alkalinity}
+                  value={typeof localData.alkalinity === 'string' ? parseFloat(localData.alkalinity) : localData.alkalinity}
                   parameter="alkalinity"
                   unitType={unit.unit_type}
                   waterType={unit.water_type}
@@ -246,7 +246,7 @@ export default function Step2WaterTest({ serviceData, updateServiceData, unit }:
                   placeholder="250"
                 />
                 <ParameterValidator
-                  value={localData.calcium}
+                  value={typeof localData.calcium === 'string' ? parseFloat(localData.calcium) : localData.calcium}
                   parameter="calcium"
                   unitType={unit.unit_type}
                   waterType={unit.water_type}
@@ -269,7 +269,7 @@ export default function Step2WaterTest({ serviceData, updateServiceData, unit }:
                   placeholder="50"
                 />
                 <ParameterValidator
-                  value={localData.cyanuric}
+                  value={typeof localData.cyanuric === 'string' ? parseFloat(localData.cyanuric) : localData.cyanuric}
                   parameter="cyanuric"
                   unitType={unit.unit_type}
                   waterType={unit.water_type}
@@ -303,7 +303,7 @@ export default function Step2WaterTest({ serviceData, updateServiceData, unit }:
                   placeholder="3.0"
                 />
                 <ParameterValidator
-                  value={localData.bromine}
+                  value={typeof localData.bromine === 'string' ? parseFloat(localData.bromine) : localData.bromine}
                   parameter="bromine"
                   unitType={unit.unit_type}
                   waterType={unit.water_type}

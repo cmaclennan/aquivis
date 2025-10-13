@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { BarChart3, Users, ClipboardList, Calendar, Filter, Download } from 'lucide-react'
 
@@ -12,7 +12,7 @@ interface KPI {
 }
 
 export default function ManagementDashboardPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [kpi, setKpi] = useState<KPI>({ totalServices: 0, completedToday: 0, pendingToday: 0, testsToday: 0 })
   const [activities, setActivities] = useState<any[]>([])
   const [properties, setProperties] = useState<any[]>([])
@@ -26,11 +26,7 @@ export default function ManagementDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [filters])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
@@ -100,7 +96,11 @@ export default function ManagementDashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, filters])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const exportActivityCsv = () => {
     const rows = [

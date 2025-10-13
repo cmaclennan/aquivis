@@ -28,7 +28,7 @@ export default function EquipmentMaintainPage({ params }: { params: Promise<{ eq
         setError(e.message)
       }
     })()
-  }, [equipmentId])
+  }, [equipmentId, supabase])
 
   const save = async () => {
     try {

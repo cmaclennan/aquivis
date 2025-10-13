@@ -58,7 +58,7 @@ export default async function PropertyDetailPage({
   const units = property.units || []
   const hasUnits = units.length > 0
   const hasIndividualUnits = property.has_individual_units || false
-  const computedTotalVolume = units.reduce((sum: number, u: any) => sum + (u?.volume_litres || 0), 0)
+  const computedTotalVolume = units.reduce((sum: number, u: { volume_litres?: number }) => sum + (u?.volume_litres || 0), 0)
   const totalVolumeLitres = property.total_volume_litres ?? 0
   const displayTotalLitres = Math.max(totalVolumeLitres || 0, computedTotalVolume || 0)
   
@@ -80,14 +80,14 @@ export default async function PropertyDetailPage({
   // Separate shared facilities from individual units based on unit_type
   // Shared: residential_pool, main_pool, kids_pool, main_spa (property-level)
   // Individual: rooftop_spa, plunge_pool, villa_pool (customer-owned)
-  const sharedFacilities = units.filter(u => 
+  const sharedFacilities = units.filter((u: { unit_type: string }) => 
     u.unit_type === 'residential_pool' || 
     u.unit_type === 'main_pool' || 
     u.unit_type === 'kids_pool' || 
     u.unit_type === 'main_spa' ||
     u.unit_type === 'splash_park'
   )
-  const individualUnits = units.filter(u => 
+  const individualUnits = units.filter((u: { unit_type: string }) => 
     u.unit_type === 'rooftop_spa' || 
     u.unit_type === 'plunge_pool' || 
     u.unit_type === 'villa_pool'
@@ -324,7 +324,7 @@ export default async function PropertyDetailPage({
 
         {hasSharedFacilities ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {sharedFacilities.map((unit) => {
+            {sharedFacilities.map((unit: any) => {
               const isSpa = unit.unit_type.includes('spa')
               return (
                 <Link
@@ -390,7 +390,7 @@ export default async function PropertyDetailPage({
 
           {hasIndividualUnitsList ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {individualUnits.map((unit) => {
+              {individualUnits.map((unit: any) => {
                 const isSpa = unit.unit_type.includes('spa')
                 return (
                   <Link

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft } from 'lucide-react'
 
 export default function InviteTeamMemberPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const { toast } = useToast()
 
@@ -39,7 +39,7 @@ export default function InviteTeamMemberPage() {
         setCustomers(custs || [])
       } catch {}
     })()
-  }, [])
+  }, [supabase])
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()

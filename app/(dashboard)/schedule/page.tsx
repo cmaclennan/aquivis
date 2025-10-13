@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Calendar, Clock, User, Home, Droplets, Settings, CheckCircle, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
@@ -36,7 +36,7 @@ export default function SchedulePage({}: Props) {
   const [technicians, setTechnicians] = useState<Array<{ id: string; name: string }>>([])
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('all')
   
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     // Load persisted property filter
@@ -45,16 +45,12 @@ export default function SchedulePage({}: Props) {
   }, [])
 
   useEffect(() => {
-    loadSchedule()
-  }, [selectedDate, selectedPropertyId])
-
-  useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('schedule.selectedProperty', selectedPropertyId)
     }
   }, [selectedPropertyId])
 
-  const loadSchedule = async () => {
+  const loadSchedule = useCallback(async () => {
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
@@ -336,7 +332,11 @@ export default function SchedulePage({}: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, selectedDate, selectedPropertyId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    loadSchedule()
+  }, [loadSchedule])
 
   // Generate tasks from a unit's custom schedule
   const generateTasksFromCustomSchedule = (

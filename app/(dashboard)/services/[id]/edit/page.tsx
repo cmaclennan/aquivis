@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
@@ -63,16 +63,9 @@ export default function EditServicePage({ params }: Props) {
   const [serviceId, setServiceId] = useState<string>('')
   
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    params.then((resolvedParams) => {
-      setServiceId(resolvedParams.id)
-      loadService(resolvedParams.id)
-    })
-  }, [])
-
-  const loadService = async (id: string) => {
+  const loadService = useCallback(async (id: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -108,7 +101,14 @@ export default function EditServicePage({ params }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setServiceId(resolvedParams.id)
+      loadService(resolvedParams.id)
+    })
+  }, [params, loadService])
 
   const handleSave = async () => {
     if (!service) return

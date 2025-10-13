@@ -1,11 +1,15 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+import { Suspense } from 'react'
+
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 
-export default function SignupPage() {
+function SignupInner() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -252,9 +256,9 @@ export default function SignupPage() {
 
           <div className="mt-6 text-center text-sm">
             <span className="text-gray-600">Already have an account? </span>
-            <a href="/login" className="font-medium text-primary hover:text-primary-600">
+            <Link href="/login" className="font-medium text-primary hover:text-primary-600">
               Sign in
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -263,6 +267,14 @@ export default function SignupPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>
+      <SignupInner />
+    </Suspense>
   )
 }
 

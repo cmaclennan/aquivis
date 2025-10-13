@@ -1,13 +1,13 @@
 'use client'
 
 import { use } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function EditPlantRoomPage({ params }: { params: Promise<{ id: string; plantRoomId: string }> }) {
   const { id: propertyId, plantRoomId } = use(params)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [name, setName] = useState('')
   const [checkFrequency, setCheckFrequency] = useState('daily')
   const [checkTimes, setCheckTimes] = useState<string[]>(['09:00'])
@@ -47,7 +47,7 @@ export default function EditPlantRoomPage({ params }: { params: Promise<{ id: st
         setLoading(false)
       }
     })()
-  }, [plantRoomId])
+  }, [plantRoomId, supabase])
 
   const updateTime = (i: number, v: string) => setCheckTimes((t) => t.map((val, idx) => (idx === i ? v : val)))
   const addTime = () => setCheckTimes((t) => [...t, '15:00'])

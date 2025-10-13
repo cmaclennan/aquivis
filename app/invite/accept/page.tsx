@@ -1,13 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useEffect, useState, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function AcceptInvitePage() {
+import { Suspense } from 'react'
+
+function AcceptInviteInner() {
   const params = useSearchParams()
   const token = params.get('token') || ''
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const [status, setStatus] = useState<'checking' | 'login' | 'accepting' | 'done' | 'error'>('checking')
   const [message, setMessage] = useState('')
@@ -69,7 +73,7 @@ export default function AcceptInvitePage() {
         setMessage(e.message || 'Failed to accept invite')
       }
     })()
-  }, [token])
+  }, [token, supabase, router])
 
   return (
     <div className="min-h-screen flex items-center justify-center">
@@ -84,6 +88,14 @@ export default function AcceptInvitePage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function AcceptInvitePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>
+      <AcceptInviteInner />
+    </Suspense>
   )
 }
 

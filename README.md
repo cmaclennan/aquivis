@@ -244,6 +244,10 @@ npm run dev
 - **[docs/PRODUCTION_CHECKLIST.md](./docs/PRODUCTION_CHECKLIST.md)** - Pre-production checklist
 - **[docs/EMAIL_SETUP_GUIDE.md](./docs/EMAIL_SETUP_GUIDE.md)** - Email configuration
 
+### **Code Quality & Maintenance**
+- **[docs/ESLINT_FIXES_COMPLETE.md](./docs/ESLINT_FIXES_COMPLETE.md)** - Complete ESLint warning resolution
+- **[docs/ESLINT_QUICK_REFERENCE.md](./docs/ESLINT_QUICK_REFERENCE.md)** - Quick reference for avoiding ESLint issues
+
 **See `/docs/README.md` for complete documentation index.**
 
 ---

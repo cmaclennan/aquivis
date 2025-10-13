@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { use } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -18,7 +18,7 @@ type Rule = {
 
 export default function PropertySchedulingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: propertyId } = use(params)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [propertyName, setPropertyName] = useState('')
@@ -34,11 +34,7 @@ export default function PropertySchedulingPage({ params }: { params: Promise<{ i
     is_active: true,
   })
 
-  useEffect(() => {
-    load()
-  }, [propertyId])
-
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
@@ -81,7 +77,11 @@ export default function PropertySchedulingPage({ params }: { params: Promise<{ i
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, propertyId])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   const saveRule = async () => {
     try {

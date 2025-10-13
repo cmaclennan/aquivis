@@ -29,7 +29,7 @@ export default function NewJobPage() {
       const { data } = await supabase.from('customers').select('id, name').eq('company_id', profile.company_id).order('name')
       setCustomers(data || [])
     })()
-  }, [])
+  }, [supabase])
 
   const save = async () => {
     try {

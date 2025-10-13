@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge, Building2, User, CreditCard } from 'lucide-react'
@@ -45,15 +45,7 @@ export default function NewIndividualUnitPage({
   const [property, setProperty] = useState<any>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
 
-  useEffect(() => {
-    // Resolve params Promise
-    params.then((resolvedParams) => {
-      setPropertyId(resolvedParams.id)
-      loadData(resolvedParams.id)
-    })
-  }, [])
-
-  const loadData = async (resolvedPropertyId: string) => {
+  const loadData = useCallback(async (resolvedPropertyId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -89,7 +81,15 @@ export default function NewIndividualUnitPage({
     } catch (err: any) {
       setError(err.message)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    // Resolve params Promise
+    params.then((resolvedParams) => {
+      setPropertyId(resolvedParams.id)
+      loadData(resolvedParams.id)
+    })
+  }, [loadData, params])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

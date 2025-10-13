@@ -38,7 +38,7 @@ export default function EditUnitEquipmentPage({ params }: { params: Promise<{ id
         setLoading(false)
       }
     })()
-  }, [equipmentId])
+  }, [equipmentId, supabase])
 
   const addTime = () => setMaintenanceTimes((t) => [...t, '15:00'])
   const removeTime = (i: number) => setMaintenanceTimes((t) => t.filter((_, idx) => idx !== i))

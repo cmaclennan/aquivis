@@ -29,7 +29,7 @@ export default function UnitEquipmentPage({ params }: { params: Promise<{ id: st
         setLoading(false)
       }
     })()
-  }, [unitId])
+  }, [unitId, supabase])
 
   return (
     <div className="p-8">

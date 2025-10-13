@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+export const dynamic = 'force-dynamic'
+
 const EMAIL_FROM = process.env.EMAIL_FROM || 'noreply@aquivis.app'
 
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = process.env.RESEND_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Resend API key not configured' }, { status: 500 })
+    }
+    const resend = new Resend(apiKey)
     const { to, inviteLink, role, firstName, lastName } = await req.json()
     if (!to || !inviteLink) {
       return NextResponse.json({ error: 'Missing to or inviteLink' }, { status: 400 })

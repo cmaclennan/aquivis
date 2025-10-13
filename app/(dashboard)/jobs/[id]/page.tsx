@@ -24,7 +24,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       setJob(data)
       setLoading(false)
     })()
-  }, [id])
+  }, [id, supabase])
 
   return (
     <div className="p-8">

@@ -1,7 +1,7 @@
 'use client'
 
 import { use } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -20,7 +20,7 @@ interface EquipmentRow {
 
 export default function PlantRoomEquipmentPage({ params }: { params: Promise<{ id: string; plantRoomId: string }> }) {
   const { id: propertyId, plantRoomId } = use(params)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
 
   const [plantRoomName, setPlantRoomName] = useState('')
@@ -52,7 +52,7 @@ export default function PlantRoomEquipmentPage({ params }: { params: Promise<{ i
         setLoading(false)
       }
     })()
-  }, [plantRoomId])
+  }, [plantRoomId, supabase])
 
   const handleSave = async (data: Omit<EquipmentRow, 'id'> & { id?: string }) => {
     try {

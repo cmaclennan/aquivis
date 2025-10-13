@@ -54,7 +54,10 @@ export default function WaterTestStep({ serviceData, updateServiceData, unit }: 
 
   useEffect(() => {
     // Validate water test data when it changes
-    if (Object.values(localData).some(value => value !== undefined && value !== null && value !== '')) {
+    if (Object.values(localData).some((value: any) => {
+      if (typeof value === 'boolean') return value === true
+      return value !== undefined && value !== null && (typeof value === 'number' ? value !== 0 : value !== '')
+    })) {
       try {
         const result = validateWaterTest(localData, unit.unit_type, unit.water_type)
         setCompliance(result)

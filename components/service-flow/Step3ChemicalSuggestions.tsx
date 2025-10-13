@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, AlertTriangle, CheckCircle } from 'lucide-react'
 import ChemicalRecommendation from '@/components/ChemicalRecommendation'
+import { QLD_STANDARDS, BROMINE_STANDARDS, getRiskCategory } from '@/lib/compliance'
 
 interface ServiceData {
   ph: string
@@ -99,6 +100,64 @@ export default function Step3ChemicalSuggestions({ serviceData, updateServiceDat
   const hasWaterTestData = serviceData.ph || serviceData.chlorine || serviceData.bromine || 
                           serviceData.salt || serviceData.alkalinity || serviceData.calcium || serviceData.cyanuric
 
+  // Build recommendations from current readings against standards
+  const recommendations = (() => {
+    try {
+      const risk = getRiskCategory(unit.unit_type)
+      const standards = unit.water_type === 'bromine' ? BROMINE_STANDARDS : QLD_STANDARDS[risk]
+
+      const recs: Array<{
+        parameter: string
+        value: number
+        target: string
+        key: string
+      }> = []
+
+      const phVal = serviceData.ph ? parseFloat(serviceData.ph) : undefined
+      if (typeof phVal === 'number' && !Number.isNaN(phVal)) {
+        if (phVal < standards.ph_min) {
+          recs.push({ parameter: 'ph', value: phVal, target: `${standards.ph_min}-${standards.ph_max}`, key: 'ph_low' })
+        } else if (phVal > standards.ph_max) {
+          recs.push({ parameter: 'ph', value: phVal, target: `${standards.ph_min}-${standards.ph_max}`, key: 'ph_high' })
+        }
+      }
+
+      if (unit.water_type !== 'bromine') {
+        const clVal = serviceData.chlorine ? parseFloat(serviceData.chlorine) : undefined
+        if (typeof clVal === 'number' && !Number.isNaN(clVal) && standards.free_chlorine_min) {
+          if (clVal < standards.free_chlorine_min) {
+            recs.push({ parameter: 'chlorine', value: clVal, target: `≥${standards.free_chlorine_min}mg/L`, key: 'chlorine_low' })
+          }
+          if (standards.free_chlorine_max && clVal > standards.free_chlorine_max) {
+            recs.push({ parameter: 'chlorine', value: clVal, target: `≤${standards.free_chlorine_max}mg/L`, key: 'chlorine_high' })
+          }
+        }
+      } else {
+        const brVal = serviceData.bromine ? parseFloat(serviceData.bromine) : undefined
+        if (typeof brVal === 'number' && !Number.isNaN(brVal) && standards.bromine_min && standards.bromine_max) {
+          if (brVal < standards.bromine_min) {
+            recs.push({ parameter: 'bromine', value: brVal, target: `${standards.bromine_min}-${standards.bromine_max}mg/L`, key: 'bromine_low' })
+          } else if (brVal > standards.bromine_max) {
+            recs.push({ parameter: 'bromine', value: brVal, target: `${standards.bromine_min}-${standards.bromine_max}mg/L`, key: 'bromine_high' })
+          }
+        }
+      }
+
+      const alkVal = serviceData.alkalinity ? parseInt(serviceData.alkalinity) : undefined
+      if (typeof alkVal === 'number' && !Number.isNaN(alkVal)) {
+        if (alkVal < standards.alkalinity_min) {
+          recs.push({ parameter: 'alkalinity', value: alkVal, target: `${standards.alkalinity_min}-${standards.alkalinity_max}mg/L`, key: 'alkalinity_low' })
+        } else if (alkVal > standards.alkalinity_max) {
+          recs.push({ parameter: 'alkalinity', value: alkVal, target: `${standards.alkalinity_min}-${standards.alkalinity_max}mg/L`, key: 'alkalinity_high' })
+        }
+      }
+
+      return recs
+    } catch {
+      return []
+    }
+  })()
+
   return (
     <div className="rounded-lg bg-white p-6 shadow">
       <div className="mb-6">
@@ -109,21 +168,34 @@ export default function Step3ChemicalSuggestions({ serviceData, updateServiceDat
       </div>
 
       {/* Chemical Recommendations */}
-      {hasWaterTestData && (
-        <div className="mb-6">
-          <ChemicalRecommendation
-            waterTestData={{
-              ph: serviceData.ph ? parseFloat(serviceData.ph) : undefined,
-              chlorine: serviceData.chlorine ? parseFloat(serviceData.chlorine) : undefined,
-              bromine: serviceData.bromine ? parseFloat(serviceData.bromine) : undefined,
-              salt: serviceData.salt ? parseInt(serviceData.salt) : undefined,
-              alkalinity: serviceData.alkalinity ? parseInt(serviceData.alkalinity) : undefined,
-              calcium: serviceData.calcium ? parseInt(serviceData.calcium) : undefined,
-              cyanuric: serviceData.cyanuric ? parseInt(serviceData.cyanuric) : undefined
-            }}
-            unitType={unit.unit_type}
-            waterType={unit.water_type}
-          />
+      {hasWaterTestData && recommendations.length > 0 && (
+        <div className="mb-6 space-y-3">
+          {recommendations.map((r, idx) => {
+            const rec = (CHEMICAL_TYPES.find(() => false) as any) // noop to keep type context
+            const db: any = {
+              ph_low: CHEMICAL_TYPES && require('@/lib/compliance').CHEMICAL_RECOMMENDATIONS.ph_low,
+              ph_high: CHEMICAL_TYPES && require('@/lib/compliance').CHEMICAL_RECOMMENDATIONS.ph_high,
+              chlorine_low: CHEMICAL_TYPES && require('@/lib/compliance').CHEMICAL_RECOMMENDATIONS.chlorine_low,
+              chlorine_high: CHEMICAL_TYPES && require('@/lib/compliance').CHEMICAL_RECOMMENDATIONS.chlorine_high,
+              alkalinity_low: CHEMICAL_TYPES && require('@/lib/compliance').CHEMICAL_RECOMMENDATIONS.alkalinity_low,
+              alkalinity_high: CHEMICAL_TYPES && require('@/lib/compliance').CHEMICAL_RECOMMENDATIONS.alkalinity_high,
+              bromine_low: CHEMICAL_TYPES && require('@/lib/compliance').CHEMICAL_RECOMMENDATIONS.bromine_low,
+              bromine_high: CHEMICAL_TYPES && require('@/lib/compliance').CHEMICAL_RECOMMENDATIONS.bromine_high,
+            }
+            const meta = db[r.key] || { chemical: 'Adjust as needed', dosage: '-', retest: '2-4 hours', safety: 'Follow safety instructions' }
+            return (
+              <ChemicalRecommendation
+                key={idx}
+                parameter={r.parameter}
+                value={r.value}
+                target={r.target}
+                chemical={meta.chemical}
+                dosage={meta.dosage}
+                retest={meta.retest}
+                safety={meta.safety}
+              />
+            )
+          })}
         </div>
       )}
 

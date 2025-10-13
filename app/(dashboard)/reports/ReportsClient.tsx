@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { BarChart3, TrendingUp, Calendar, Filter, Download, X } from 'lucide-react'
@@ -53,17 +53,9 @@ export default function ReportsClient() {
     status: ''
   })
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    if (activeTab === 'services') {
-      loadData()
-    } else {
-      loadEquipmentData()
-    }
-  }, [filters, activeTab])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
@@ -163,9 +155,9 @@ export default function ReportsClient() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, filters])
 
-  const loadEquipmentData = async () => {
+  const loadEquipmentData = useCallback(async () => {
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
@@ -201,7 +193,15 @@ export default function ReportsClient() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, filters])
+
+  useEffect(() => {
+    if (activeTab === 'services') {
+      loadData()
+    } else {
+      loadEquipmentData()
+    }
+  }, [filters, activeTab, loadData, loadEquipmentData])
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters(prev => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Calendar, User, Droplets, AlertTriangle, CheckCircle, Edit, Trash2 } from 'lucide-react'
 
@@ -31,13 +31,9 @@ export default function ServicesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    loadServices()
-  }, [])
-
-  const loadServices = async () => {
+  const loadServices = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -72,14 +68,24 @@ export default function ServicesPage() {
       }
       
       console.log('Loaded services:', data)
-      setServices(data || [])
+      const normalized: Service[] = (data || []).map((s: any) => ({
+        ...s,
+        technician: Array.isArray(s.technician) ? s.technician[0] : s.technician,
+        unit: Array.isArray(s.unit) ? s.unit[0] : s.unit,
+        property: Array.isArray(s.property) ? s.property[0] : s.property,
+      }))
+      setServices(normalized)
     } catch (err: any) {
       console.error('Services loading error:', err)
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    loadServices()
+  }, [loadServices])
 
   const getStatusIcon = (status: string) => {
     switch (status) {

@@ -20,7 +20,7 @@ export default function JobsPage() {
       setJobs(data || [])
       setLoading(false)
     })()
-  }, [])
+  }, [supabase])
 
   return (
     <div className="p-8">

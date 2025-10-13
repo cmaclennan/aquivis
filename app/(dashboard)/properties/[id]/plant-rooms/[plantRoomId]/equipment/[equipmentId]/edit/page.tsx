@@ -38,7 +38,7 @@ export default function EditPlantRoomEquipmentPage({ params }: { params: Promise
         setLoading(false)
       }
     })()
-  }, [equipmentId])
+  }, [equipmentId, supabase])
 
   const addTime = () => setMaintenanceTimes((t) => [...t, '15:00'])
   const removeTime = (i: number) => setMaintenanceTimes((t) => t.filter((_, idx) => idx !== i))

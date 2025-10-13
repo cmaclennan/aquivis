@@ -1,11 +1,15 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+import { Suspense } from 'react'
+
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 
-export default function LoginPage() {
+function LoginInner() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -122,21 +126,21 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center text-sm">
             <span className="text-gray-600">Don&apos;t have an account? </span>
-            <a href="/signup" className="font-medium text-primary hover:text-primary-600">
+            <Link href="/signup" className="font-medium text-primary hover:text-primary-600">
               Sign up
-            </a>
+            </Link>
           </div>
 
           <div className="mt-4 text-center">
-            <a href="/customer-portal/login" className="text-sm text-gray-600 hover:text-primary">
+            <Link href="/customer-portal/login" className="text-sm text-gray-600 hover:text-primary">
               Customer Portal →
-            </a>
+            </Link>
           </div>
           
           <div className="mt-2 text-center">
-            <a href="/super-admin-login" className="text-xs text-gray-400 hover:text-gray-600">
+            <Link href="/super-admin-login" className="text-xs text-gray-400 hover:text-gray-600">
               Admin Access
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -145,6 +149,14 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>
+      <LoginInner />
+    </Suspense>
   )
 }
 

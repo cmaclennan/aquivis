@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle } from 'lucide-react'
 
@@ -21,13 +21,9 @@ export default function WaterQualityChart({ unitId, parameter, className = '' }:
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    loadChartData()
-  }, [unitId, parameter])
-
-  const loadChartData = async () => {
+  const loadChartData = useCallback(async () => {
     try {
       const { data: waterTests, error: waterTestsError } = await supabase
         .from('water_tests')
@@ -43,11 +39,11 @@ export default function WaterQualityChart({ unitId, parameter, className = '' }:
 
       if (waterTestsError) throw waterTestsError
 
-      const chartData = waterTests?.map(test => ({
-        date: test.service.service_date,
-        value: test[parameter],
-        compliant: test.all_parameters_ok
-      })) || []
+      const chartData = (waterTests || []).map((test: { service: any; [key: string]: any }) => ({
+        date: Array.isArray(test.service) ? (test.service[0]?.service_date || '') : (test.service?.service_date || ''),
+        value: Number(test[parameter] ?? 0),
+        compliant: !!test.all_parameters_ok
+      }))
 
       setData(chartData)
     } catch (err: any) {
@@ -55,7 +51,11 @@ export default function WaterQualityChart({ unitId, parameter, className = '' }:
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, parameter])
+
+  useEffect(() => {
+    loadChartData()
+  }, [loadChartData])
 
   const getParameterLabel = () => {
     switch (parameter) {

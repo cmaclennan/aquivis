@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CheckCircle, XCircle, Wrench, Droplets, Filter, Thermometer } from 'lucide-react'
 
 interface ServiceData {
@@ -98,7 +98,7 @@ export default function MaintenanceStep({ serviceData, updateServiceData, unit }
                  unit.unit_type === 'residential_pool'
 
   // Filter maintenance tasks based on unit type
-  const getAvailableTasks = () => {
+  const getAvailableTasks = useCallback(() => {
     if (isSpa) {
       // Spa-specific tasks
       return MAINTENANCE_TASKS.filter(task => 
@@ -111,9 +111,9 @@ export default function MaintenanceStep({ serviceData, updateServiceData, unit }
       return MAINTENANCE_TASKS
     }
     return MAINTENANCE_TASKS
-  }
+  }, [isSpa, isPool])
 
-  const initializeTasks = () => {
+  const initializeTasks = useCallback(() => {
     if (localData.length === 0) {
       const availableTasks = getAvailableTasks()
       const tasks = availableTasks.map(task => ({
@@ -124,7 +124,7 @@ export default function MaintenanceStep({ serviceData, updateServiceData, unit }
       setLocalData(tasks)
       updateServiceData({ maintenanceTasks: tasks })
     }
-  }
+  }, [localData.length, updateServiceData, getAvailableTasks])
 
   const updateTask = (index: number, field: string, value: any) => {
     const updated = localData.map((task, i) => 
@@ -166,7 +166,7 @@ export default function MaintenanceStep({ serviceData, updateServiceData, unit }
     if (localData.length === 0) {
       initializeTasks()
     }
-  }, []) // Empty dependency array - only run once on mount
+  }, [localData.length, initializeTasks]) // Include dependencies
 
   return (
     <div className="p-8">

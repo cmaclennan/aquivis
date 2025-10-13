@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Calendar, Clock, Settings, Shuffle, Plus, Trash2, Save, Home } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -62,7 +62,7 @@ export default function ScheduleBuilder({
   const [scheduleType, setScheduleType] = useState<ScheduleType>('simple')
   const [scheduleName, setScheduleName] = useState('')
   const [scheduleDescription, setScheduleDescription] = useState('')
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [companyId, setCompanyId] = useState<string>('')
   const [templates, setTemplates] = useState<any[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
@@ -197,7 +197,7 @@ export default function ScheduleBuilder({
         setTemplates(tpl || [])
       } catch {}
     })()
-  }, [])
+  }, [supabase])
 
   // Handle simple schedule changes
   const updateSimpleConfig = (field: keyof SimpleScheduleConfig, value: any) => {

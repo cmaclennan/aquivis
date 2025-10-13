@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Copy, X, Link as LinkIcon } from 'lucide-react'
+import Link from 'next/link'
 
 export default async function TeamInvitationsPage() {
   const supabase = await createClient()
@@ -20,7 +21,7 @@ export default async function TeamInvitationsPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Pending Invitations</h1>
-        <a href="/team/invite" className="rounded-md bg-primary px-4 py-2 text-white hover:bg-primary-600">New Invite</a>
+        <Link href="/team/invite" className="rounded-md bg-primary px-4 py-2 text-white hover:bg-primary-600">New Invite</Link>
       </div>
 
       <div className="rounded-lg bg-white shadow overflow-hidden">
@@ -51,12 +52,12 @@ export default async function TeamInvitationsPage() {
                         .update({ is_revoked: true })
                         .eq('id', inv.id)
                     }}>
-                      <a
+                      <Link
                         href={`/invite/accept?token=${inv.token}`}
                         className="inline-flex items-center text-primary hover:text-primary-600"
                       >
                         <LinkIcon className="h-4 w-4 mr-1" /> Open Link
-                      </a>
+                      </Link>
                       <button type="submit" className="inline-flex items-center text-red-600 hover:text-red-800">
                         <X className="h-4 w-4 mr-1" /> Revoke
                       </button>

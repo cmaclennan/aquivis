@@ -1,7 +1,7 @@
 'use client'
 
 import { use } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -9,7 +9,7 @@ type EquipmentCategory = 'pump' | 'filter' | 'chlorinator' | 'heater' | 'other'
 
 export default function PlantRoomCheckPage({ params }: { params: Promise<{ id: string; plantRoomId: string }> }) {
   const { id: propertyId, plantRoomId } = use(params)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [plantRoom, setPlantRoom] = useState<any>(null)
   const [propertyName, setPropertyName] = useState('')
   const [time, setTime] = useState<string>('09:00')
@@ -64,7 +64,7 @@ export default function PlantRoomCheckPage({ params }: { params: Promise<{ id: s
         setError(e.message)
       }
     })()
-  }, [plantRoomId, propertyId])
+  }, [plantRoomId, propertyId, supabase])
 
   const setField = (eqId: string, patch: Partial<EquipmentCheckState>) => {
     setEquipmentChecks(prev => ({ ...prev, [eqId]: { ...(prev[eqId] || { status: 'normal' }), ...patch } }))

@@ -177,7 +177,7 @@ export default async function CustomerDetailPage({
         <div className="mb-8 rounded-lg bg-white p-6 shadow">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Properties</h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {properties.map((property) => (
+            {properties.map((property: any) => (
               <Link
                 key={property.id}
                 href={`/properties/${property.id}`}
@@ -196,7 +196,7 @@ export default async function CustomerDetailPage({
         <div className="rounded-lg bg-white p-6 shadow">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Units Managed</h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {units.map((unit) => (
+            {units.map((unit: any) => (
               <div
                 key={unit.id}
                 className="flex items-center space-x-3 rounded-lg border border-gray-200 p-3"

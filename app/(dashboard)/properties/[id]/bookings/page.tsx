@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Plus, Save, Trash2, Calendar, User, Home } from 'lucide-react'
@@ -45,16 +45,9 @@ export default function BookingsPage({ params }: Props) {
   const [propertyId, setPropertyId] = useState<string>('')
   
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    params.then((resolvedParams) => {
-      setPropertyId(resolvedParams.id)
-      loadData(resolvedParams.id)
-    })
-  }, [])
-
-  const loadData = async (propId: string) => {
+  const loadData = useCallback(async (propId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -100,7 +93,14 @@ export default function BookingsPage({ params }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setPropertyId(resolvedParams.id)
+      loadData(resolvedParams.id)
+    })
+  }, [params, loadData])
 
   const handleAddBooking = async (bookingData: Omit<Booking, 'id' | 'unit'>) => {
     try {
@@ -108,7 +108,7 @@ export default function BookingsPage({ params }: Props) {
       setError(null)
 
       // Find unit by name/number
-      const unit = property.units.find(u => 
+      const unit = property?.units?.find((u: any) => 
         u.name.toLowerCase().includes(bookingData.unit_id.toLowerCase()) ||
         u.name === bookingData.unit_id
       )
@@ -150,7 +150,12 @@ export default function BookingsPage({ params }: Props) {
     }
   }
 
-  const handleUpdateBooking = async (bookingData: Booking) => {
+  const handleUpdateBooking = async (bookingData: Booking | Omit<Booking, 'id' | 'unit'>) => {
+    // Type guard: if it's an edit, it should have an id
+    if (!('id' in bookingData)) {
+      setError('Invalid booking data for update')
+      return
+    }
     try {
       setSaving(true)
       setError(null)
@@ -211,7 +216,7 @@ export default function BookingsPage({ params }: Props) {
 
       for (const booking of bulkData.bookings) {
         // Find unit by name/number
-        const unit = property.units.find(u => 
+        const unit = property?.units?.find((u: any) => 
           u.name.toLowerCase().includes(booking.unitNumber.toLowerCase()) ||
           u.name === booking.unitNumber
         )

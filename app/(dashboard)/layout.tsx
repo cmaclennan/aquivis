@@ -125,7 +125,7 @@ export default async function DashboardLayout({
         <div className="p-3 border-t border-gray-100">
           <div className="rounded-lg bg-primary-50 p-3">
             <div className="flex items-center justify-between">
-              <a
+              <Link
                 href="/profile"
                 className="min-w-0 flex-1 hover:bg-primary-100 rounded p-1 -m-1 transition-colors"
               >
@@ -133,14 +133,14 @@ export default async function DashboardLayout({
                   {profile.first_name} {profile.last_name}
                 </p>
                 <p className="text-xs text-primary-600 capitalize truncate">{profile.role}</p>
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/logout"
                 className="flex-shrink-0 ml-2 text-primary-600 hover:text-primary-700 transition-colors"
                 title="Logout"
               >
                 <LogOut className="h-4 w-4" />
-              </a>
+              </Link>
             </div>
           </div>
         </div>

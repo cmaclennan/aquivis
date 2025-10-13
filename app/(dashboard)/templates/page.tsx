@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import ScheduleBuilder from '@/components/scheduling/ScheduleBuilder'
@@ -18,7 +18,7 @@ type TemplateRow = {
 }
 
 export default function TemplatesPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [companyId, setCompanyId] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,11 +32,7 @@ export default function TemplatesPage() {
   const [renamingId, setRenamingId] = useState<string>('')
   const [renameValue, setRenameValue] = useState<string>('')
 
-  useEffect(() => {
-    load()
-  }, [])
-
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
@@ -61,7 +57,11 @@ export default function TemplatesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   const saveNewTemplate = async (schedule: any) => {
     try {

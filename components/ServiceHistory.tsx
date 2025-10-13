@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Calendar, User, Droplets, CheckCircle, AlertTriangle, Clock, ExternalLink } from 'lucide-react'
@@ -32,13 +32,9 @@ export default function ServiceHistory({ unitId, className = '' }: ServiceHistor
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    loadServiceHistory()
-  }, [unitId])
-
-  const loadServiceHistory = async () => {
+  const loadServiceHistory = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('services')
@@ -55,13 +51,21 @@ export default function ServiceHistory({ unitId, className = '' }: ServiceHistor
         .limit(20)
 
       if (error) throw error
-      setServices(data || [])
+      const normalized: Service[] = (data || []).map((s: any) => ({
+        ...s,
+        technician: Array.isArray(s.technician) ? s.technician[0] : s.technician,
+      }))
+      setServices(normalized)
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, unitId])
+
+  useEffect(() => {
+    loadServiceHistory()
+  }, [loadServiceHistory])
 
   const getServiceTypeLabel = (type: string) => {
     switch (type) {

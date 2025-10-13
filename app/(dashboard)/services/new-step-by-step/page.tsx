@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react'
@@ -77,7 +77,7 @@ interface ServiceData {
 export default function NewServiceStepByStepPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   // Current step (1-6)
   const [currentStep, setCurrentStep] = useState(1)
@@ -109,17 +109,7 @@ export default function NewServiceStepByStepPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-    
-    // Check for unit parameter in URL
-    const unitParam = searchParams.get('unit')
-    if (unitParam) {
-      loadUnit(unitParam)
-    }
-  }, [searchParams])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -145,9 +135,9 @@ export default function NewServiceStepByStepPage() {
     } catch (err: any) {
       setError(err.message)
     }
-  }
+  }, [supabase])
 
-  const loadUnit = async (unitId: string) => {
+  const loadUnit = useCallback(async (unitId: string) => {
     try {
       const { data: unitData, error: unitError } = await supabase
         .from('units')
@@ -162,11 +152,11 @@ export default function NewServiceStepByStepPage() {
         .single()
 
       if (unitError) throw unitError
-      setUnit(unitData)
+      setUnit(unitData ? { ...unitData, property: Array.isArray(unitData.property) ? unitData.property[0] : unitData.property } : null)
     } catch (err: any) {
       setError(err.message)
     }
-  }
+  }, [supabase])
 
   const updateServiceData = (updates: Partial<ServiceData>) => {
     setServiceData(prev => ({ ...prev, ...updates }))
@@ -203,7 +193,7 @@ export default function NewServiceStepByStepPage() {
     }
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -302,7 +292,17 @@ export default function NewServiceStepByStepPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, router, serviceData.alkalinity, serviceData.bromine, serviceData.calcium, serviceData.chemicalAdditions, serviceData.chlorine, serviceData.cyanuric, serviceData.isFilterCleaned, serviceData.isPumpRunning, serviceData.isWaterWarm, serviceData.maintenanceTasks, serviceData.notes, serviceData.ph, serviceData.salt, serviceData.serviceDate, serviceData.serviceType, serviceData.technicianId, unit?.id, unit?.property.id])
+
+  useEffect(() => {
+    loadData()
+    
+    // Check for unit parameter in URL
+    const unitParam = searchParams.get('unit')
+    if (unitParam) {
+      loadUnit(unitParam)
+    }
+  }, [searchParams, loadData, loadUnit])
 
   if (!unit) {
     return (

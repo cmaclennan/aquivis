@@ -1,12 +1,12 @@
 'use client'
 
-import { use, useEffect, useState } from 'react'
+import { use, useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function PlantRoomsListPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: propertyId } = use(params)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [plantRooms, setPlantRooms] = useState<any[]>([])
   const [propertyName, setPropertyName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -30,7 +30,7 @@ export default function PlantRoomsListPage({ params }: { params: Promise<{ id: s
         setLoading(false)
       }
     })()
-  }, [propertyId])
+  }, [propertyId, supabase])
 
   return (
     <div className="p-8">
