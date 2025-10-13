@@ -63,7 +63,6 @@ export default function SignupPage() {
         errorMessage: signUpError?.message,
         errorCode: signUpError?.code,
         errorStatus: signUpError?.status,
-        errorDetails: signUpError?.details,
         errorHint: signUpError?.hint
       }
 
