@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut, Droplets, Settings, BarChart3, Calendar } from 'lucide-react'
 
 export default async function DashboardLayout({
@@ -35,11 +36,13 @@ export default async function DashboardLayout({
         {/* Logo & Company Name */}
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 flex-shrink-0">
-              <img 
+            <div className="h-10 w-10 flex-shrink-0 relative">
+              <Image 
                 src="/logo-192.png" 
                 alt="Aquivis Logo" 
-                className="h-full w-full object-contain"
+                width={40}
+                height={40}
+                className="object-contain"
               />
             </div>
             <div className="min-w-0 flex-1">

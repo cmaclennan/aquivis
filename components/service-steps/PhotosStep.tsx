@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Camera, Upload, X, Image as ImageIcon, Plus } from 'lucide-react'
+import Image from 'next/image'
 
 interface ServiceData {
   photos: Array<{
@@ -165,11 +166,12 @@ export default function PhotosStep({ serviceData, updateServiceData, unit }: Pro
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {localData.map((photo, index) => (
               <div key={index} className="relative group">
-                <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                  <img
+                <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 relative">
+                  <Image
                     src={photo.url}
                     alt={`Service photo ${index + 1}`}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
                   />
                 </div>
                 

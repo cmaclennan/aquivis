@@ -1,13 +1,17 @@
+import Image from 'next/image'
+
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-b from-white to-accent-50">
       <div className="text-center">
         <div className="mb-8">
-          <div className="w-24 h-24 mx-auto">
-            <img 
+          <div className="w-24 h-24 mx-auto relative">
+            <Image 
               src="/logo-192.png" 
               alt="Aquivis Logo" 
-              className="w-full h-full object-contain"
+              width={96}
+              height={96}
+              className="object-contain"
             />
           </div>
         </div>

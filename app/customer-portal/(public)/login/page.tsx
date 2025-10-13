@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 
 export default function CustomerLoginPage() {
   const [email, setEmail] = useState('')
@@ -41,8 +42,8 @@ export default function CustomerLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-white to-accent-50">
       <div className="w-full max-w-md p-8">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 h-16 w-16">
-            <img src="/logo-192.png" alt="Aquivis Logo" className="h-full w-full object-contain" />
+          <div className="mx-auto mb-4 h-16 w-16 relative">
+            <Image src="/logo-192.png" alt="Aquivis Logo" width={64} height={64} className="object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Aquivis</h1>
           <p className="mt-1 text-sm text-gray-600">Customer Portal Sign In</p>

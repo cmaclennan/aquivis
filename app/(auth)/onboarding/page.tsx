@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 type BusinessType = 'residential' | 'commercial' | 'both'
 
@@ -65,11 +66,13 @@ export default function OnboardingPage() {
       <div className="w-full max-w-2xl">
         {/* Progress */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 h-12 w-12">
-            <img 
+          <div className="mx-auto mb-4 h-12 w-12 relative">
+            <Image 
               src="/logo-192.png" 
               alt="Aquivis Logo" 
-              className="h-full w-full object-contain"
+              width={48}
+              height={48}
+              className="object-contain"
             />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Welcome to Aquivis</h1>
