@@ -6,6 +6,7 @@ export async function GET() {
   
   await supabase.auth.signOut()
   
-  return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+  // Use relative URL to avoid HTTPS/HTTP issues
+  return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_APP_URL || 'https://www.aquivis.co'))
 }
 
