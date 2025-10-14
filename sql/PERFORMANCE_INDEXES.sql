@@ -12,10 +12,6 @@ ON properties(created_at);
 CREATE INDEX IF NOT EXISTS idx_units_property_id 
 ON units(property_id);
 
-CREATE INDEX IF NOT EXISTS idx_units_company_id 
-ON units(property_id) 
-WHERE property_id IN (SELECT id FROM properties);
-
 -- Services table indexes (most critical for dashboard performance)
 CREATE INDEX IF NOT EXISTS idx_services_created_at 
 ON services(created_at);
@@ -29,13 +25,9 @@ ON services(technician_id);
 CREATE INDEX IF NOT EXISTS idx_services_status 
 ON services(status);
 
--- Composite index for dashboard queries (company_id + created_at)
-CREATE INDEX IF NOT EXISTS idx_services_company_created 
-ON services(unit_id, created_at) 
-WHERE unit_id IN (
-  SELECT u.id FROM units u 
-  JOIN properties p ON u.property_id = p.id
-);
+-- Composite index for dashboard queries (unit_id + created_at)
+CREATE INDEX IF NOT EXISTS idx_services_unit_created 
+ON services(unit_id, created_at);
 
 -- Bookings table indexes
 CREATE INDEX IF NOT EXISTS idx_bookings_check_in_date 
