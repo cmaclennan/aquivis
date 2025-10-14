@@ -20,8 +20,7 @@ export async function middleware(request: NextRequest) {
     '/jobs',
     '/equipment',
     '/profile',
-    '/settings',
-    '/customer-portal'
+    '/settings'
   ]
 
   const authRoutes = ['/login', '/signup']
@@ -152,7 +151,6 @@ export const config = {
     '/equipment/:path*',
     '/profile/:path*',
     '/settings/:path*',
-    '/customer-portal/:path*',
     '/login',
     '/signup'
   ],
