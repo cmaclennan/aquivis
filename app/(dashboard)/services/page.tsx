@@ -1,7 +1,8 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Calendar, User, Droplets, AlertTriangle, CheckCircle, Edit, Trash2 } from 'lucide-react'
 
@@ -27,14 +28,13 @@ interface Service {
 }
 
 export default function ServicesPage() {
-  const [services, setServices] = useState<Service[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
   const supabase = useMemo(() => createClient(), [])
 
-  const loadServices = useCallback(async () => {
-    try {
+  // Use React Query for caching and performance
+  const { data: services = [], isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
@@ -62,30 +62,23 @@ export default function ServicesPage() {
         .order('service_date', { ascending: false })
         .limit(50)
 
-      if (error) {
-        console.error('Services query error:', error)
-        throw error
-      }
+      if (error) throw error
       
-      console.log('Loaded services:', data)
-      const normalized: Service[] = (data || []).map((s: any) => ({
+      // Normalize the data structure
+      return (data || []).map((s: any) => ({
         ...s,
         technician: Array.isArray(s.technician) ? s.technician[0] : s.technician,
         unit: Array.isArray(s.unit) ? s.unit[0] : s.unit,
         property: Array.isArray(s.property) ? s.property[0] : s.property,
-      }))
-      setServices(normalized)
-    } catch (err: any) {
-      console.error('Services loading error:', err)
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [supabase])
+      })) as Service[]
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  })
 
-  useEffect(() => {
-    loadServices()
-  }, [loadServices])
+  if (queryError) {
+    setError(queryError.message)
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {

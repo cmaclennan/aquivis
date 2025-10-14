@@ -14,72 +14,84 @@ export default async function DashboardPage() {
     .eq('id', user!.id)
     .single()
 
-  // Get actual property count
-  const { count: propertyCount } = await supabase
-    .from('properties')
-    .select('*', { count: 'exact', head: true })
-    .eq('company_id', profile!.company_id)
-
-  // Get unit count
-  const { count: unitCount } = await supabase
-    .from('units')
-    .select('*, properties!inner(*)', { count: 'exact', head: true })
-    .eq('properties.company_id', profile!.company_id)
-
-  // Get today's services
+  // Parallelize all database queries for maximum performance
   const today = new Date().toISOString().split('T')[0]
-  const { count: todayServiceCount } = await supabase
-    .from('services')
-    .select('*, units!inner(properties!inner(*))', { count: 'exact', head: true })
-    .eq('units.properties.company_id', profile!.company_id)
-    .gte('created_at', `${today}T00:00:00.000Z`)
-    .lt('created_at', `${today}T23:59:59.999Z`)
-
-  // Get recent services (last 5)
-  const { data: recentServices } = await supabase
-    .from('services')
-    .select(`
-      *,
-      unit:units!inner(name, unit_type, properties!inner(name))
-    `)
-    .eq('units.properties.company_id', profile!.company_id)
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  // Get this week's service count
   const weekStart = new Date()
   weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-  const { count: weekServiceCount } = await supabase
-    .from('services')
-    .select('*, units!inner(properties!inner(*))', { count: 'exact', head: true })
-    .eq('units.properties.company_id', profile!.company_id)
-    .gte('created_at', weekStart.toISOString())
 
-  // Get water quality issues (services with water test issues)
-  const { data: waterQualityIssues } = await supabase
-    .from('services')
-    .select(`
-      *,
-      unit:units!inner(name, unit_type, properties!inner(name)),
-      water_tests(all_parameters_ok)
-    `)
-    .eq('units.properties.company_id', profile!.company_id)
-    .eq('water_tests.all_parameters_ok', false)
-    .order('created_at', { ascending: false })
-    .limit(3)
-
-  // Get upcoming bookings (check-ins today)
-  const { data: upcomingBookings } = await supabase
-    .from('bookings')
-    .select(`
-      *,
-      unit:units!inner(name, unit_type, properties!inner(name, has_individual_units))
-    `)
-    .eq('unit.properties.company_id', profile!.company_id)
-    .eq('unit.properties.has_individual_units', true)
-    .eq('check_in_date', today)
-    .order('check_in_date', { ascending: true })
-    .limit(5)
+  const [
+    { count: propertyCount },
+    { count: unitCount },
+    { count: todayServiceCount },
+    { count: weekServiceCount },
+    { data: recentServices },
+    { data: waterQualityIssues },
+    { data: upcomingBookings }
+  ] = await Promise.all([
+    // Property count
+    supabase
+      .from('properties')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', profile!.company_id),
+    
+    // Unit count
+    supabase
+      .from('units')
+      .select('*, properties!inner(*)', { count: 'exact', head: true })
+      .eq('properties.company_id', profile!.company_id),
+    
+    // Today's services count
+    supabase
+      .from('services')
+      .select('*, units!inner(properties!inner(*))', { count: 'exact', head: true })
+      .eq('units.properties.company_id', profile!.company_id)
+      .gte('created_at', `${today}T00:00:00.000Z`)
+      .lt('created_at', `${today}T23:59:59.999Z`),
+    
+    // This week's service count
+    supabase
+      .from('services')
+      .select('*, units!inner(properties!inner(*))', { count: 'exact', head: true })
+      .eq('units.properties.company_id', profile!.company_id)
+      .gte('created_at', weekStart.toISOString()),
+    
+    // Recent services (last 5)
+    supabase
+      .from('services')
+      .select(`
+        *,
+        unit:units!inner(name, unit_type, properties!inner(name))
+      `)
+      .eq('units.properties.company_id', profile!.company_id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    
+    // Water quality issues
+    supabase
+      .from('services')
+      .select(`
+        *,
+        unit:units!inner(name, unit_type, properties!inner(name)),
+        water_tests(all_parameters_ok)
+      `)
+      .eq('units.properties.company_id', profile!.company_id)
+      .eq('water_tests.all_parameters_ok', false)
+      .order('created_at', { ascending: false })
+      .limit(3),
+    
+    // Upcoming bookings
+    supabase
+      .from('bookings')
+      .select(`
+        *,
+        unit:units!inner(name, unit_type, properties!inner(name, has_individual_units))
+      `)
+      .eq('unit.properties.company_id', profile!.company_id)
+      .eq('unit.properties.has_individual_units', true)
+      .eq('check_in_date', today)
+      .order('check_in_date', { ascending: true })
+      .limit(5)
+  ])
 
   // Calculate quick start progress
   const hasProperties = (propertyCount ?? 0) > 0
