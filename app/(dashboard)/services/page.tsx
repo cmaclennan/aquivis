@@ -11,20 +11,12 @@ interface Service {
   service_date: string
   service_type: string
   status: string
-  technician: {
-    first_name: string
-    last_name: string
-  } | null
-  unit: {
-    name: string
-    unit_type: string
-  } | null
-  property: {
-    name: string
-  } | null
-  water_tests: {
-    all_parameters_ok: boolean
-  }[] | null
+  technician_name: string
+  unit_name: string
+  unit_type: string
+  property_name: string
+  all_parameters_ok: boolean | null
+  company_id: string
 }
 
 export default function ServicesPage() {
@@ -47,30 +39,16 @@ export default function ServicesPage() {
       if (!profile?.company_id) throw new Error('No company found')
 
       const { data, error } = await supabase
-        .from('services')
-        .select(`
-          id,
-          service_date,
-          service_type,
-          status,
-          technician:profiles!services_technician_id_fkey(first_name, last_name),
-          unit:units(name, unit_type),
-          property:properties(name),
-          water_tests(all_parameters_ok)
-        `)
-        .eq('property.company_id', profile.company_id)
+        .from('services_optimized')
+        .select('*')
+        .eq('company_id', profile.company_id)
         .order('service_date', { ascending: false })
         .limit(50)
 
       if (error) throw error
       
-      // Normalize the data structure
-      return (data || []).map((s: any) => ({
-        ...s,
-        technician: Array.isArray(s.technician) ? s.technician[0] : s.technician,
-        unit: Array.isArray(s.unit) ? s.unit[0] : s.unit,
-        property: Array.isArray(s.property) ? s.property[0] : s.property,
-      })) as Service[]
+      // Data is already normalized from the optimized view
+      return (data || []) as Service[]
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
@@ -221,19 +199,19 @@ export default function ServicesPage() {
                   <div className="text-sm text-gray-600 space-y-1">
                     <div className="flex items-center space-x-2">
                       <span className="font-medium">Property:</span>
-                      <span>{service.property?.name || 'Unknown'}</span>
+                      <span>{service.property_name || 'Unknown'}</span>
                     </div>
                     
-                    {service.unit && (
+                    {service.unit_name && (
                       <div className="flex items-center space-x-2">
                         <span className="font-medium">Unit:</span>
-                        <span>{service.unit.name} ({service.unit.unit_type.replace('_', ' ')})</span>
+                        <span>{service.unit_name} ({service.unit_type.replace('_', ' ')})</span>
                       </div>
                     )}
                     
                     <div className="flex items-center space-x-2">
                       <User className="h-4 w-4" />
-                      <span>{service.technician ? `${service.technician.first_name} ${service.technician.last_name}` : 'Unassigned'}</span>
+                      <span>{service.technician_name || 'Unassigned'}</span>
                     </div>
                     
                     <div className="flex items-center space-x-2">
@@ -242,15 +220,15 @@ export default function ServicesPage() {
                     </div>
                   </div>
                   
-                  {service.water_tests && service.water_tests.length > 0 && (
+                  {service.all_parameters_ok !== null && (
                     <div className="mt-3 flex items-center space-x-2">
-                      {service.water_tests[0].all_parameters_ok ? (
+                      {service.all_parameters_ok ? (
                         <CheckCircle className="h-4 w-4 text-green-600" />
                       ) : (
                         <AlertTriangle className="h-4 w-4 text-red-600" />
                       )}
                       <span className="text-sm text-gray-600">
-                        Water test: {service.water_tests[0].all_parameters_ok ? 'All parameters OK' : 'Issues detected'}
+                        Water test: {service.all_parameters_ok ? 'All parameters OK' : 'Issues detected'}
                       </span>
                     </div>
                   )}

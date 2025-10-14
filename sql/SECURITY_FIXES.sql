@@ -299,11 +299,11 @@ BEGIN
 END $$;
 
 -- Fix is_super_admin function (if exists)
-DO $$
+DO $func$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_name = 'is_super_admin') THEN
         CREATE OR REPLACE FUNCTION public.is_super_admin()
-        RETURNS BOOLEAN AS $$
+        RETURNS BOOLEAN AS $body$
           SELECT EXISTS (
             SELECT 1 FROM profiles 
             WHERE id = auth.uid() 
@@ -312,53 +312,53 @@ BEGIN
               SELECT id FROM companies WHERE name = 'Super Admin Company'
             )
           );
-        $$ LANGUAGE SQL SECURITY DEFINER STABLE SET search_path = public;
+        $body$ LANGUAGE SQL SECURITY DEFINER STABLE SET search_path = public;
     END IF;
-END $$;
+END $func$;
 
 -- Fix super_admin_target_company function (if exists)
-DO $$
+DO $func$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_name = 'super_admin_target_company') THEN
         CREATE OR REPLACE FUNCTION public.super_admin_target_company()
-        RETURNS UUID AS $$
+        RETURNS UUID AS $body$
           SELECT company_id FROM profiles WHERE id = auth.uid();
-        $$ LANGUAGE SQL SECURITY DEFINER STABLE SET search_path = public;
+        $body$ LANGUAGE SQL SECURITY DEFINER STABLE SET search_path = public;
     END IF;
-END $$;
+END $func$;
 
 -- Fix log_super_admin_action function (if exists)
-DO $$
+DO $func$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_name = 'log_super_admin_action') THEN
         CREATE OR REPLACE FUNCTION public.log_super_admin_action(action_text TEXT)
-        RETURNS VOID AS $$
+        RETURNS VOID AS $body$
         BEGIN
           -- Log super admin actions (implementation depends on requirements)
           INSERT INTO audit_log (user_id, action, created_at) 
           VALUES (auth.uid(), action_text, NOW());
         END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+        $body$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
     END IF;
-END $$;
+END $func$;
 
 -- Fix audit_super_admin_action function (if exists)
-DO $$
+DO $func$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_name = 'audit_super_admin_action') THEN
         CREATE OR REPLACE FUNCTION public.audit_super_admin_action(action_text TEXT)
-        RETURNS VOID AS $$
+        RETURNS VOID AS $body$
         BEGIN
           -- Audit super admin actions (implementation depends on requirements)
           INSERT INTO audit_log (user_id, action, created_at) 
           VALUES (auth.uid(), action_text, NOW());
         END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+        $body$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
     END IF;
-END $$;
+END $func$;
 
 -- Fix get_company_stats function (if exists)
-DO $$
+DO $func$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_name = 'get_company_stats') THEN
         CREATE OR REPLACE FUNCTION public.get_company_stats()
@@ -366,7 +366,7 @@ BEGIN
           property_count BIGINT,
           unit_count BIGINT,
           service_count BIGINT
-        ) AS $$
+        ) AS $body$
         BEGIN
           RETURN QUERY
           SELECT 
@@ -378,46 +378,46 @@ BEGIN
           LEFT JOIN services s ON s.property_id = p.id
           WHERE p.company_id = public.user_company_id();
         END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+        $body$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
     END IF;
-END $$;
+END $func$;
 
 -- Fix handle_new_user function (if exists)
-DO $$
+DO $func$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_name = 'handle_new_user') THEN
         CREATE OR REPLACE FUNCTION public.handle_new_user()
-        RETURNS TRIGGER AS $$
+        RETURNS TRIGGER AS $body$
         BEGIN
           -- Handle new user creation (implementation depends on requirements)
           INSERT INTO profiles (id, email, company_id, role)
           VALUES (NEW.id, NEW.email, NULL, 'technician');
           RETURN NEW;
         END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+        $body$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
     END IF;
-END $$;
+END $func$;
 
 -- Fix create_profile_for_user function (if exists)
-DO $$
+DO $func$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_name = 'create_profile_for_user') THEN
         CREATE OR REPLACE FUNCTION public.create_profile_for_user(user_id UUID, user_email TEXT, company_id UUID)
-        RETURNS VOID AS $$
+        RETURNS VOID AS $body$
         BEGIN
           INSERT INTO profiles (id, email, company_id, role)
           VALUES (user_id, user_email, company_id, 'technician');
         END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+        $body$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
     END IF;
-END $$;
+END $func$;
 
 -- Fix ensure_user_profile function (if exists)
-DO $$
+DO $func$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_name = 'ensure_user_profile') THEN
         CREATE OR REPLACE FUNCTION public.ensure_user_profile()
-        RETURNS TRIGGER AS $$
+        RETURNS TRIGGER AS $body$
         BEGIN
           -- Ensure user has a profile (implementation depends on requirements)
           IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = NEW.id) THEN
@@ -426,9 +426,9 @@ BEGIN
           END IF;
           RETURN NEW;
         END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+        $body$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
     END IF;
-END $$;
+END $func$;
 
 -- ============================================
 -- 4. ADD MISSING RLS POLICIES

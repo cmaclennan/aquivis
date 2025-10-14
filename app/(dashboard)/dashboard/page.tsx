@@ -14,330 +14,334 @@ export default async function DashboardPage() {
     .eq('id', user!.id)
     .single()
 
-  // Parallelize all database queries for maximum performance
-  const today = new Date().toISOString().split('T')[0]
-  const weekStart = new Date()
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+  // Use optimized dashboard view for maximum performance
+  const { data: dashboardStats } = await supabase
+    .from('dashboard_stats_optimized')
+    .select('*')
+    .eq('company_id', profile!.company_id)
+    .single()
 
+  // Get additional data for recent services and upcoming bookings using optimized views
   const [
-    { count: propertyCount },
-    { count: unitCount },
-    { count: todayServiceCount },
-    { count: weekServiceCount },
     { data: recentServices },
-    { data: waterQualityIssues },
     { data: upcomingBookings }
   ] = await Promise.all([
-    // Property count
+    // Recent services (last 5) using optimized view
     supabase
-      .from('properties')
-      .select('*', { count: 'exact', head: true })
-      .eq('company_id', profile!.company_id),
-    
-    // Unit count
-    supabase
-      .from('units')
-      .select('*, properties!inner(*)', { count: 'exact', head: true })
-      .eq('properties.company_id', profile!.company_id),
-    
-    // Today's services count
-    supabase
-      .from('services')
-      .select('*, units!inner(properties!inner(*))', { count: 'exact', head: true })
-      .eq('units.properties.company_id', profile!.company_id)
-      .gte('created_at', `${today}T00:00:00.000Z`)
-      .lt('created_at', `${today}T23:59:59.999Z`),
-    
-    // This week's service count
-    supabase
-      .from('services')
-      .select('*, units!inner(properties!inner(*))', { count: 'exact', head: true })
-      .eq('units.properties.company_id', profile!.company_id)
-      .gte('created_at', weekStart.toISOString()),
-    
-    // Recent services (last 5)
-    supabase
-      .from('services')
-      .select(`
-        *,
-        unit:units!inner(name, unit_type, properties!inner(name))
-      `)
-      .eq('units.properties.company_id', profile!.company_id)
+      .from('services_optimized')
+      .select('*')
+      .eq('company_id', profile!.company_id)
       .order('created_at', { ascending: false })
       .limit(5),
     
-    // Water quality issues
-    supabase
-      .from('services')
-      .select(`
-        *,
-        unit:units!inner(name, unit_type, properties!inner(name)),
-        water_tests(all_parameters_ok)
-      `)
-      .eq('units.properties.company_id', profile!.company_id)
-      .eq('water_tests.all_parameters_ok', false)
-      .order('created_at', { ascending: false })
-      .limit(3),
-    
-    // Upcoming bookings
+    // Upcoming bookings (today's check-ins)
     supabase
       .from('bookings')
       .select(`
         *,
-        unit:units!inner(name, unit_type, properties!inner(name, has_individual_units))
+        units!inner(
+          name,
+          unit_number,
+          properties!inner(name, company_id)
+        )
       `)
-      .eq('unit.properties.company_id', profile!.company_id)
-      .eq('unit.properties.has_individual_units', true)
-      .eq('check_in_date', today)
-      .order('check_in_date', { ascending: true })
+      .eq('units.properties.company_id', profile!.company_id)
+      .eq('check_in_date', new Date().toISOString().split('T')[0])
+      .order('check_in_time', { ascending: true })
       .limit(5)
   ])
 
-  // Calculate quick start progress
-  const hasProperties = (propertyCount ?? 0) > 0
-  const hasUnits = (unitCount ?? 0) > 0
-  const hasServices = (todayServiceCount ?? 0) > 0
+  // Calculate quick start progress using optimized data
+  const hasProperties = (dashboardStats?.property_count ?? 0) > 0
+  const hasUnits = (dashboardStats?.unit_count ?? 0) > 0
+  const hasServices = (dashboardStats?.today_services ?? 0) > 0
   const allStepsComplete = hasProperties && hasUnits && hasServices
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-2 text-gray-600">
-          Welcome back, {profile?.first_name}!
-        </p>
-      </div>
-
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="rounded-lg bg-white p-6 shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Properties</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{propertyCount ?? 0}</p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-50">
-              <Building2 className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-          {!hasProperties && (
-            <p className="mt-4 text-sm text-gray-600">
-              <Link href="/properties/new" className="text-primary hover:text-primary-600">
-                Add your first property →
-              </Link>
-            </p>
-          )}
-        </div>
-
-        <div className="rounded-lg bg-white p-6 shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Services Today</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{todayServiceCount ?? 0}</p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-light">
-              <CheckCircle2 className="h-6 w-6 text-success" />
-            </div>
-          </div>
-          <p className="mt-4 text-sm text-gray-600">
-            {(todayServiceCount ?? 0) > 0 ? `${todayServiceCount} service${(todayServiceCount ?? 0) > 1 ? 's' : ''} completed` : 'No services completed today'}
-          </p>
-        </div>
-
-        <div className="rounded-lg bg-white p-6 shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Team Members</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">1</p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-100">
-              <User className="h-6 w-6 text-accent-700" />
-            </div>
-          </div>
-          {profile?.role === 'owner' && (
-            <p className="mt-4 text-sm text-gray-600">
-              <Link href="/team" className="text-primary hover:text-primary-600">
-                Invite team members →
-              </Link>
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Enhanced Dashboard Widgets */}
-      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Today's Schedule */}
-        <div className="rounded-lg bg-white p-6 shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Today's Schedule</h2>
-            <Link
-              href="/schedule"
-              className="text-sm text-primary hover:text-primary-600"
-            >
-              View All →
-            </Link>
-          </div>
+    <div className="space-y-6">
+      {/* Quick Start Progress */}
+      {!allStepsComplete && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <h2 className="text-lg font-semibold text-blue-900 mb-4">Quick Start Progress</h2>
           <div className="space-y-3">
-            {upcomingBookings && upcomingBookings.length > 0 ? (
-              upcomingBookings.map((booking: any) => (
-                <div key={booking.id} className="flex items-center space-x-3 p-3 rounded-lg bg-blue-50">
-                  <Calendar className="h-4 w-4 text-blue-600" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      Check-in: {booking.unit.name}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {booking.unit.properties.name}
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-4">
-                <Calendar className="mx-auto h-8 w-8 text-gray-400" />
-                <p className="mt-2 text-sm text-gray-500">No check-ins today</p>
-                <Link
-                  href="/schedule"
-                  className="mt-2 inline-block text-sm text-primary hover:text-primary-600"
-                >
-                  View Schedule →
+            <div className="flex items-center space-x-3">
+              {hasProperties ? (
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+              ) : (
+                <div className="h-5 w-5 rounded-full border-2 border-blue-300" />
+              )}
+              <span className={hasProperties ? 'text-green-700' : 'text-blue-700'}>
+                {hasProperties ? 'Properties added' : 'Add your first property'}
+              </span>
+              {!hasProperties && (
+                <Link href="/properties/new" className="text-blue-600 hover:text-blue-800 underline">
+                  Add Property
                 </Link>
-              </div>
-            )}
-          </div>
+              )}
+      </div>
+
+            <div className="flex items-center space-x-3">
+              {hasUnits ? (
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+              ) : (
+                <div className="h-5 w-5 rounded-full border-2 border-blue-300" />
+              )}
+              <span className={hasUnits ? 'text-green-700' : 'text-blue-700'}>
+                {hasUnits ? 'Units configured' : 'Add units to your properties'}
+              </span>
+              {!hasUnits && hasProperties && (
+                <Link href="/units/new" className="text-blue-600 hover:text-blue-800 underline">
+                  Add Unit
+                </Link>
+          )}
         </div>
 
-        {/* Recent Activity */}
-        <div className="rounded-lg bg-white p-6 shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
-            <Link
-              href="/services"
-              className="text-sm text-primary hover:text-primary-600"
+            <div className="flex items-center space-x-3">
+              {hasServices ? (
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+              ) : (
+                <div className="h-5 w-5 rounded-full border-2 border-blue-300" />
+              )}
+              <span className={hasServices ? 'text-green-700' : 'text-blue-700'}>
+                {hasServices ? 'Services scheduled' : 'Schedule your first service'}
+              </span>
+              {!hasServices && hasUnits && (
+                <Link href="/services/new" className="text-blue-600 hover:text-blue-800 underline">
+                  Schedule Service
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dashboard Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Properties */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Properties</p>
+              <p className="text-2xl font-bold text-gray-900">{dashboardStats?.property_count ?? 0}</p>
+            </div>
+            <Building2 className="h-8 w-8 text-blue-600" />
+            </div>
+          <div className="mt-4">
+            <Link 
+              href="/properties" 
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              View Properties →
+            </Link>
+            </div>
+        </div>
+
+        {/* Units */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Units</p>
+              <p className="text-2xl font-bold text-gray-900">{dashboardStats?.unit_count ?? 0}</p>
+            </div>
+            <Droplets className="h-8 w-8 text-green-600" />
+            </div>
+          <div className="mt-4">
+            <Link 
+              href="/units" 
+              className="text-sm text-green-600 hover:text-green-800 font-medium"
+            >
+              View Units →
+            </Link>
+        </div>
+      </div>
+
+        {/* Today's Services */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Today's Services</p>
+              <p className="text-2xl font-bold text-gray-900">{dashboardStats?.today_services ?? 0}</p>
+            </div>
+            <Calendar className="h-8 w-8 text-purple-600" />
+            </div>
+          <div className="mt-4">
+            <Link 
+              href="/services" 
+              className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+            >
+              View Services →
+            </Link>
+            </div>
+          </div>
+
+        {/* This Week's Services */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">This Week</p>
+              <p className="text-2xl font-bold text-gray-900">{dashboardStats?.week_services ?? 0}</p>
+            </div>
+            <TrendingUp className="h-8 w-8 text-orange-600" />
+          </div>
+          <div className="mt-4">
+            <Link 
+              href="/services" 
+              className="text-sm text-orange-600 hover:text-orange-800 font-medium"
             >
               View All →
             </Link>
+              </div>
+              </div>
+            </div>
+
+      {/* Water Quality Issues */}
+      {dashboardStats?.water_quality_issues && dashboardStats.water_quality_issues > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <div className="flex items-center space-x-3">
+            <AlertTriangle className="h-6 w-6 text-red-600" />
+            <div>
+              <h3 className="text-lg font-semibold text-red-900">Water Quality Issues</h3>
+              <p className="text-red-700">
+                {dashboardStats.water_quality_issues} service{dashboardStats.water_quality_issues !== 1 ? 's' : ''} with water quality issues need attention.
+              </p>
+            </div>
           </div>
-          <div className="space-y-3">
+          <div className="mt-4">
+            <Link 
+              href="/services?filter=water_quality_issues" 
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+            >
+              Review Issues
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Services */}
+        <div className="bg-white rounded-lg shadow-sm border">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Recent Services</h3>
+              <Link 
+                href="/services" 
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                View All
+              </Link>
+            </div>
+          </div>
+          <div className="p-6">
             {recentServices && recentServices.length > 0 ? (
-              recentServices.map((service: any) => (
-                <div key={service.id} className="flex items-center space-x-3 p-3 rounded-lg bg-gray-50">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      {service.service_type.replace('_', ' ')} - {service.unit.name}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {service.unit.properties.name} • {new Date(service.created_at).toLocaleDateString()}
-                    </p>
+              <div className="space-y-4">
+                {recentServices.map((service: any) => (
+                  <div key={service.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`h-2 w-2 rounded-full ${
+                        service.status === 'completed' ? 'bg-green-500' :
+                        service.status === 'in_progress' ? 'bg-yellow-500' :
+                        'bg-blue-500'
+                      }`} />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {service.property_name} - {service.unit_name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {service.technician_name} • {new Date(service.service_date).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      service.status === 'completed' ? 'bg-green-100 text-green-800' :
+                      service.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {service.status.replace('_', ' ')}
+                    </span>
                   </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-4">
-                <Droplets className="mx-auto h-8 w-8 text-gray-400" />
-                <p className="mt-2 text-sm text-gray-500">No recent services</p>
-                <Link
-                  href="/services/new-guided"
-                  className="mt-2 inline-block text-sm text-primary hover:text-primary-600"
-                >
-                  Log Service →
-                </Link>
+                ))}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Water Quality Alerts */}
-        {waterQualityIssues && waterQualityIssues.length > 0 && (
-          <div className="rounded-lg bg-white p-6 shadow">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Water Quality Alerts</h2>
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+            ) : (
+              <p className="text-gray-500 text-center py-4">No recent services</p>
+                )}
+              </div>
             </div>
-            <div className="space-y-3">
-              {waterQualityIssues.map((service: any) => (
-                <div key={service.id} className="flex items-center space-x-3 p-3 rounded-lg bg-yellow-50">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      {service.unit.name} - Water Quality Issue
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {service.unit.properties.name} • {new Date(service.created_at).toLocaleDateString()}
-                    </p>
+
+        {/* Upcoming Bookings */}
+        <div className="bg-white rounded-lg shadow-sm border">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Today's Check-ins</h3>
+              <Link 
+                href="/bookings" 
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                View All
+              </Link>
+            </div>
+              </div>
+          <div className="p-6">
+            {upcomingBookings && upcomingBookings.length > 0 ? (
+              <div className="space-y-4">
+                {upcomingBookings.map((booking: any) => (
+                  <div key={booking.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Clock className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {booking.units.properties.name} - {booking.units.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Check-in: {booking.check_in_time}
+                </p>
+              </div>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {booking.guest_name}
+                    </span>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Weekly Summary */}
-        <div className="rounded-lg bg-white p-6 shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">This Week</h2>
-            <TrendingUp className="h-5 w-5 text-green-600" />
-          </div>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Services Completed</span>
-              <span className="text-lg font-semibold text-gray-900">{weekServiceCount ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Today's Services</span>
-              <span className="text-lg font-semibold text-gray-900">{todayServiceCount ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Properties</span>
-              <span className="text-lg font-semibold text-gray-900">{propertyCount ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Total Units</span>
-              <span className="text-lg font-semibold text-gray-900">{unitCount ?? 0}</span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-center py-4">No check-ins today</p>
+            )}
             </div>
           </div>
         </div>
-      </div>
 
       {/* Quick Actions */}
-      <div className="mt-8 rounded-lg bg-white p-6 shadow">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Link
-            href="/services/new-guided"
-            className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary-50 transition-colors"
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Link 
+            href="/services/new" 
+            className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <Plus className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium text-gray-900">Log Service</span>
+            <Plus className="h-5 w-5 text-blue-600" />
+            <span className="text-sm font-medium text-gray-900">Schedule Service</span>
           </Link>
-          <Link
-            href="/schedule"
-            className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary-50 transition-colors"
+          
+          <Link 
+            href="/properties/new" 
+            className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <Calendar className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium text-gray-900">View Schedule</span>
+            <Building2 className="h-5 w-5 text-green-600" />
+            <span className="text-sm font-medium text-gray-900">Add Property</span>
           </Link>
-          <Link
-            href="/properties"
-            className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary-50 transition-colors"
+          
+          <Link 
+            href="/customers/new" 
+            className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <Building2 className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium text-gray-900">Manage Properties</span>
+            <User className="h-5 w-5 text-purple-600" />
+            <span className="text-sm font-medium text-gray-900">Add Customer</span>
           </Link>
-          <Link
-            href="/reports"
-            className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary-50 transition-colors"
-          >
-            <TrendingUp className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium text-gray-900">View Reports</span>
-          </Link>
-        </div>
+      </div>
       </div>
 
-      {/* Aquivis Ready Dialog - Only shows once */}
+      {/* Aquivis Ready Dialog */}
       <AquivisReadyDialog />
     </div>
   )
 }
-
