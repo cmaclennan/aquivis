@@ -134,6 +134,9 @@ export async function middleware(request: NextRequest) {
   return response
 }
 
+// Force Node.js runtime to avoid Edge Runtime compatibility issues with Supabase
+export const runtime = 'nodejs'
+
 export const config = {
   matcher: [
     // Only run on specific routes that need authentication
