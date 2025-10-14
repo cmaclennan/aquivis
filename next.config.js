@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   // Performance optimizations
-  swcMinify: true,
   compress: true,
   poweredByHeader: false,
   
@@ -12,9 +11,8 @@ const nextConfig = {
     minimumCacheTTL: 60,
   },
   
-  // Experimental features for performance
+  // Safe experimental features for performance
   experimental: {
-    optimizeCss: true,
     optimizePackageImports: ['lucide-react'],
   },
   
