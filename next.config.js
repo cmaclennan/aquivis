@@ -1,7 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Minimal configuration for testing
   reactStrictMode: true,
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+        ],
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig
