@@ -9,8 +9,9 @@ export async function middleware(request: NextRequest) {
     '/dashboard',
     '/properties',
     '/services',
+    '/customers',        // ✅ ADDED - was missing!
     '/reports', 
-    '/billing',
+    // '/billing',      // ❌ REMOVED - route doesn't exist!
     '/team',
     '/onboarding',
     '/management',
@@ -143,8 +144,9 @@ export const config = {
     '/dashboard/:path*',
     '/properties/:path*', 
     '/services/:path*',
+    '/customers/:path*',        // ✅ ADDED - was missing!
     '/reports/:path*',
-    '/billing/:path*',
+    // '/billing/:path*',     // ❌ REMOVED - route doesn't exist!
     '/team/:path*',
     '/onboarding/:path*',
     '/management/:path*',

@@ -1,35 +1,40 @@
 'use client'
 
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Mail, Phone, MapPin, CreditCard } from 'lucide-react'
 import Link from 'next/link'
-
-type CustomerType = 'property_owner' | 'body_corporate' | 'hotel' | 'property_manager' | 'b2b_wholesale'
+import { customerSchema, type CustomerFormData } from '@/lib/validations/schemas'
 
 export default function NewCustomerPage() {
   const router = useRouter()
   const supabase = createClient()
   
-  // Form state
-  const [name, setName] = useState('')
-  const [customerType, setCustomerType] = useState<CustomerType>('property_owner')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [address, setAddress] = useState('')
-  const [city, setCity] = useState('')
-  const [state, setState] = useState('QLD')
-  const [postalCode, setPostalCode] = useState('')
-  const [billingEmail, setBillingEmail] = useState('')
-  const [paymentTerms, setPaymentTerms] = useState('Net 30')
-  const [notes, setNotes] = useState('')
+  // Form with validation
+  const form = useForm<CustomerFormData>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      name: '',
+      customer_type: 'property_owner',
+      email: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: 'QLD',
+      postal_code: '',
+      billing_email: '',
+      payment_terms: 'Net 30',
+      notes: '',
+    }
+  })
   
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (data: CustomerFormData) => {
     setLoading(true)
     setError(null)
 
@@ -46,22 +51,22 @@ export default function NewCustomerPage() {
 
       if (!profile?.company_id) throw new Error('No company found')
 
-      // Create customer
+      // Data is already validated by Zod resolver
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .insert({
           company_id: profile.company_id,
-          name: name.trim(),
-          customer_type: customerType,
-          email: email.trim() || null,
-          phone: phone.trim() || null,
-          address: address.trim() || null,
-          city: city.trim() || null,
-          state: state.trim() || null,
-          postal_code: postalCode.trim() || null,
-          billing_email: billingEmail.trim() || null,
-          payment_terms: paymentTerms,
-          notes: notes.trim() || null,
+          name: data.name.trim(),
+          customer_type: data.customer_type,
+          email: data.email?.trim() || null,
+          phone: data.phone?.trim() || null,
+          address: data.address?.trim() || null,
+          city: data.city?.trim() || null,
+          state: data.state?.trim() || null,
+          postal_code: data.postal_code?.trim() || null,
+          billing_email: data.billing_email?.trim() || null,
+          payment_terms: data.payment_terms || 'Net 30',
+          notes: data.notes?.trim() || null,
         })
         .select()
         .single()
@@ -96,7 +101,7 @@ export default function NewCustomerPage() {
 
       {/* Form */}
       <div className="max-w-2xl">
-        <form onSubmit={handleSubmit} className="rounded-lg bg-white p-6 shadow">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="rounded-lg bg-white p-6 shadow">
           {error && (
             <div className="mb-6 rounded-lg bg-error-light p-4 text-sm text-error">
               {error}
@@ -112,12 +117,17 @@ export default function NewCustomerPage() {
             <input
               type="text"
               id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+              {...form.register('name')}
+              className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                form.formState.errors.name 
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                  : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+              }`}
               placeholder="e.g., Accor Hotels, John Smith, Sea Temple Body Corporate"
-              required
             />
+            {form.formState.errors.name && (
+              <p className="mt-1 text-sm text-red-600">{form.formState.errors.name.message}</p>
+            )}
           </div>
 
           {/* Customer Type */}
@@ -127,9 +137,12 @@ export default function NewCustomerPage() {
             </label>
             <select
               id="type"
-              value={customerType}
-              onChange={(e) => setCustomerType(e.target.value as CustomerType)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+              {...form.register('customer_type')}
+              className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                form.formState.errors.customer_type 
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                  : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+              }`}
             >
               <option value="property_owner">Property Owner</option>
               <option value="body_corporate">Body Corporate</option>
@@ -137,6 +150,9 @@ export default function NewCustomerPage() {
               <option value="property_manager">Property Manager</option>
               <option value="b2b_wholesale">B2B Wholesale</option>
             </select>
+            {form.formState.errors.customer_type && (
+              <p className="mt-1 text-sm text-red-600">{form.formState.errors.customer_type.message}</p>
+            )}
             <p className="mt-1 text-xs text-gray-500">
               Determines billing structure and reporting
             </p>
@@ -155,11 +171,17 @@ export default function NewCustomerPage() {
                 <input
                   type="email"
                   id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                  {...form.register('email')}
+                  className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                    form.formState.errors.email 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                      : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+                  }`}
                   placeholder="contact@example.com"
                 />
+                {form.formState.errors.email && (
+                  <p className="mt-1 text-sm text-red-600">{form.formState.errors.email.message}</p>
+                )}
               </div>
 
               <div>
@@ -170,11 +192,17 @@ export default function NewCustomerPage() {
                 <input
                   type="tel"
                   id="phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                  {...form.register('phone')}
+                  className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                    form.formState.errors.phone 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                      : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+                  }`}
                   placeholder="0400 000 000"
                 />
+                {form.formState.errors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{form.formState.errors.phone.message}</p>
+                )}
               </div>
             </div>
           </div>
@@ -189,14 +217,20 @@ export default function NewCustomerPage() {
                   <MapPin className="h-4 w-4" />
                   <span>Street Address</span>
                 </label>
-                <input
-                  type="text"
-                  id="address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  placeholder="123 Main Street"
-                />
+            <input
+              type="text"
+              id="address"
+              {...form.register('address')}
+              className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                form.formState.errors.address 
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                  : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+              }`}
+              placeholder="123 Main Street"
+            />
+            {form.formState.errors.address && (
+              <p className="mt-1 text-sm text-red-600">{form.formState.errors.address.message}</p>
+            )}
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -207,11 +241,17 @@ export default function NewCustomerPage() {
                   <input
                     type="text"
                     id="city"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                    {...form.register('city')}
+                    className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                      form.formState.errors.city 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                        : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+                    }`}
                     placeholder="Brisbane"
                   />
+                  {form.formState.errors.city && (
+                    <p className="mt-1 text-sm text-red-600">{form.formState.errors.city.message}</p>
+                  )}
                 </div>
 
                 <div>
@@ -221,11 +261,17 @@ export default function NewCustomerPage() {
                   <input
                     type="text"
                     id="state"
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                    {...form.register('state')}
+                    className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                      form.formState.errors.state 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                        : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+                    }`}
                     placeholder="QLD"
                   />
+                  {form.formState.errors.state && (
+                    <p className="mt-1 text-sm text-red-600">{form.formState.errors.state.message}</p>
+                  )}
                 </div>
               </div>
 
@@ -236,11 +282,17 @@ export default function NewCustomerPage() {
                 <input
                   type="text"
                   id="postalCode"
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                  {...form.register('postal_code')}
+                  className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                    form.formState.errors.postal_code 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                      : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+                  }`}
                   placeholder="4000"
                 />
+                {form.formState.errors.postal_code && (
+                  <p className="mt-1 text-sm text-red-600">{form.formState.errors.postal_code.message}</p>
+                )}
               </div>
             </div>
           </div>
@@ -258,11 +310,17 @@ export default function NewCustomerPage() {
                 <input
                   type="email"
                   id="billingEmail"
-                  value={billingEmail}
-                  onChange={(e) => setBillingEmail(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                  {...form.register('billing_email')}
+                  className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                    form.formState.errors.billing_email 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                      : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+                  }`}
                   placeholder="billing@example.com (defaults to contact email if blank)"
                 />
+                {form.formState.errors.billing_email && (
+                  <p className="mt-1 text-sm text-red-600">{form.formState.errors.billing_email.message}</p>
+                )}
               </div>
 
               <div>
@@ -271,9 +329,12 @@ export default function NewCustomerPage() {
                 </label>
                 <select
                   id="paymentTerms"
-                  value={paymentTerms}
-                  onChange={(e) => setPaymentTerms(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+                  {...form.register('payment_terms')}
+                  className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                    form.formState.errors.payment_terms 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                      : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+                  }`}
                 >
                   <option value="Due on Receipt">Due on Receipt</option>
                   <option value="Net 7">Net 7 Days</option>
@@ -281,6 +342,9 @@ export default function NewCustomerPage() {
                   <option value="Net 30">Net 30 Days</option>
                   <option value="Net 60">Net 60 Days</option>
                 </select>
+                {form.formState.errors.payment_terms && (
+                  <p className="mt-1 text-sm text-red-600">{form.formState.errors.payment_terms.message}</p>
+                )}
               </div>
             </div>
           </div>
@@ -292,12 +356,18 @@ export default function NewCustomerPage() {
             </label>
             <textarea
               id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              {...form.register('notes')}
               rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
+              className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                form.formState.errors.notes 
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+                  : 'border-gray-300 focus:border-primary focus:ring-primary-200'
+              }`}
               placeholder="Any special billing instructions or notes"
             />
+            {form.formState.errors.notes && (
+              <p className="mt-1 text-sm text-red-600">{form.formState.errors.notes.message}</p>
+            )}
           </div>
 
           {/* Actions */}
@@ -310,7 +380,7 @@ export default function NewCustomerPage() {
             </Link>
             <button
               type="submit"
-              disabled={loading || !name}
+              disabled={loading}
               className="rounded-lg bg-primary px-6 py-2 text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Creating...' : 'Create Customer'}
