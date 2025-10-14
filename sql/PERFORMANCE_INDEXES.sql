@@ -54,12 +54,23 @@ ON profiles(role);
 CREATE INDEX IF NOT EXISTS idx_customers_company_id 
 ON customers(company_id);
 
--- Equipment logs indexes
-CREATE INDEX IF NOT EXISTS idx_equipment_logs_unit_id 
-ON equipment_logs(unit_id);
+-- Equipment indexes
+CREATE INDEX IF NOT EXISTS idx_equipment_plant_room_id 
+ON equipment(plant_room_id);
 
-CREATE INDEX IF NOT EXISTS idx_equipment_logs_created_at 
-ON equipment_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_equipment_unit_id 
+ON equipment(unit_id);
+
+-- Chemical additions indexes
+CREATE INDEX IF NOT EXISTS idx_chemical_additions_service_id 
+ON chemical_additions(service_id);
+
+-- Equipment checks indexes
+CREATE INDEX IF NOT EXISTS idx_equipment_checks_service_id 
+ON equipment_checks(service_id);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_checks_equipment_id 
+ON equipment_checks(equipment_id);
 
 -- Analyze tables after creating indexes for optimal query planning
 ANALYZE properties;
@@ -69,4 +80,6 @@ ANALYZE bookings;
 ANALYZE water_tests;
 ANALYZE profiles;
 ANALYZE customers;
-ANALYZE equipment_logs;
+ANALYZE equipment;
+ANALYZE chemical_additions;
+ANALYZE equipment_checks;

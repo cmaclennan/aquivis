@@ -32,7 +32,7 @@ export default function ServicesPage() {
   const supabase = useMemo(() => createClient(), [])
 
   // Use React Query for caching and performance
-  const { data: services = [], isLoading: loading, error: queryError } = useQuery({
+  const { data: services = [], isLoading: loading, error: queryError, refetch } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -135,7 +135,7 @@ export default function ServicesPage() {
       if (error) throw error
 
       // Reload services
-      loadServices()
+      refetch()
     } catch (err: any) {
       console.error('Delete error:', err)
       alert('Failed to delete service: ' + err.message)
