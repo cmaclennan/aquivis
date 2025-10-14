@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { Plus, Building2, MapPin } from 'lucide-react'
 import { formatLitresShort } from '@/lib/utils'
 import Link from 'next/link'
@@ -15,6 +16,10 @@ export default async function PropertiesPage() {
     .eq('id', user!.id)
     .single()
 
+  if (!profile?.company_id) {
+    redirect('/onboarding')
+  }
+
   // Get all properties for this company
   const { data: properties } = await supabase
     .from('properties')
@@ -22,7 +27,7 @@ export default async function PropertiesPage() {
       *,
       units:units(volume_litres)
     `)
-    .eq('company_id', profile!.company_id)
+    .eq('company_id', profile.company_id)
     .order('name')
 
   const hasProperties = properties && properties.length > 0
