@@ -15,9 +15,11 @@ const nextConfig = {
   
   // Safe experimental features for performance
   experimental: {
-    optimizePackageImports: ['lucide-react', '@supabase/ssr'],
-    serverComponentsExternalPackages: ['@supabase/ssr'],
+    optimizePackageImports: ['lucide-react'],
   },
+  
+  // External packages for server components
+  serverExternalPackages: ['@supabase/ssr'],
   
   // Bundle analyzer (uncomment to analyze bundle size)
   // webpack: (config, { isServer }) => {
