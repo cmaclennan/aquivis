@@ -33,6 +33,55 @@
 
 ## 📊 Current Issues
 
+### Issue #028: Vercel Middleware Edge Runtime Error
+- **Category:** 🚀 DEPLOY / 🐛 BUG
+- **Severity:** Critical (deployment fails)
+- **Date:** 2025-01-14
+- **Status:** ✅ RESOLVED
+
+**Problem:**
+```
+500: INTERNAL_SERVER_ERROR Code: MIDDLEWARE_INVOCATION_FAILED
+[ReferenceError: __dirname is not defined]
+```
+
+**Root Cause:**
+- Using outdated `@supabase/ssr@0.5.2` package
+- Package had compatibility issues with Vercel's Edge Runtime
+- Edge Runtime doesn't support Node.js globals like `__dirname`
+
+**Attempted Solutions:**
+1. ❌ Enhanced middleware error handling - No effect
+2. ❌ Added timeout and Promise.race - No effect  
+3. ❌ Created vercel.json with Node.js runtime - Build failed
+4. ❌ Removed vercel.json - Issue persisted
+
+**Working Solution:**
+✅ **Updated @supabase/ssr package:**
+```bash
+npm install @supabase/ssr@latest
+```
+- Updated from `0.5.2` to `0.7.0`
+- New version is fully compatible with Edge Runtime
+- No code changes required
+
+**Files Modified:**
+- `package.json` - Updated dependency version
+- `package-lock.json` - Updated dependency tree
+
+**Testing Results:**
+- ✅ Local build successful
+- ✅ Local development server working
+- ✅ Middleware functioning correctly
+- 🔄 Ready for Vercel deployment test
+
+**Prevention:**
+- Always use latest stable versions of edge-compatible packages
+- Test middleware locally before deployment
+- Monitor Vercel runtime logs for compatibility issues
+
+---
+
 ### Issue #009: Services Page Relationship Error
 - **Category:** 🗄️ DATABASE / 🐛 BUG
 - **Severity:** High (page crashes)
