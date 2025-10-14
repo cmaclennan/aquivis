@@ -1,14 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { Building2, CheckCircle2, User, Check, Calendar, Clock, AlertTriangle, TrendingUp, Plus, Droplets } from 'lucide-react'
+import AquivisReadyDialog from '@/components/AquivisReadyDialog'
 import Link from 'next/link'
-import { Suspense } from 'react'
-import dynamic from 'next/dynamic'
-
-// Lazy load the dialog component
-const AquivisReadyDialog = dynamic(() => import('@/components/AquivisReadyDialog'), {
-  ssr: false,
-  loading: () => null
-})
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -331,9 +324,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Aquivis Ready Dialog - Only shows once */}
-      <Suspense fallback={null}>
-        <AquivisReadyDialog />
-      </Suspense>
+      <AquivisReadyDialog />
     </div>
   )
 }
