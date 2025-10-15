@@ -70,7 +70,7 @@ export default async function ProfilePage() {
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-green-100 text-green-800'
                     }`}>
-                      {profile?.role?.charAt(0).toUpperCase() + profile?.role?.slice(1)}
+                      {profile?.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1) : 'User'}
                     </span>
                   </div>
                 </div>

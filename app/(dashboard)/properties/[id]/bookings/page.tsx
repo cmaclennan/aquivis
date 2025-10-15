@@ -87,7 +87,7 @@ export default function BookingsPage({ params }: Props) {
         .order('check_in_date', { ascending: false })
 
       if (bookingsError) throw bookingsError
-      setBookings(bookingsData || [])
+      setBookings((bookingsData || []) as Booking[])
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -141,7 +141,7 @@ export default function BookingsPage({ params }: Props) {
 
       if (error) throw error
 
-      setBookings(prev => [data, ...prev])
+      setBookings(prev => [data as Booking, ...prev])
       setShowAddForm(false)
     } catch (err: any) {
       setError(err.message)
@@ -172,7 +172,7 @@ export default function BookingsPage({ params }: Props) {
       if (error) throw error
 
       setBookings(prev => prev.map(booking => 
-        booking.id === bookingData.id ? bookingData : booking
+        booking.id === bookingData.id ? (bookingData as Booking) : booking
       ))
       setEditingBooking(null)
     } catch (err: any) {
@@ -262,7 +262,7 @@ export default function BookingsPage({ params }: Props) {
 
       if (error) throw error
 
-      setBookings(prev => [...(data || []), ...prev])
+      setBookings(prev => [...((data || []) as Booking[]), ...prev])
       setShowBulkForm(false)
     } catch (err: any) {
       setError(err.message)
