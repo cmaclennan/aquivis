@@ -9,11 +9,15 @@ export default async function PropertiesPage() {
   
   const { data: { user } } = await supabase.auth.getUser()
   
+  if (!user) {
+    redirect('/login')
+  }
+  
   // Get user's company
   const { data: profile } = await supabase
     .from('profiles')
     .select('company_id')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
 
   if (!profile?.company_id) {

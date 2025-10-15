@@ -1,10 +1,13 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Calendar, User, Droplets, AlertTriangle, CheckCircle, Edit, Trash2 } from 'lucide-react'
+import { SentryErrorBoundaryClass } from '@/components/ui/sentry-error-boundary'
+import { trackPageLoad } from '@/lib/performance-monitoring'
+import { handleQueryError, reportError } from '@/lib/sentry'
 
 interface Service {
   id: string
@@ -22,6 +25,12 @@ interface Service {
 export default function ServicesPage() {
   const [error, setError] = useState<string | null>(null)
   const supabase = useMemo(() => createClient(), [])
+  
+  // Track page load
+  useEffect(() => {
+    const trackLoad = trackPageLoad('services')
+    return () => trackLoad()
+  }, [])
 
   // Use React Query for caching and performance
   const { data: services = [], isLoading: loading, error: queryError, refetch } = useQuery({
@@ -55,6 +64,7 @@ export default function ServicesPage() {
   })
 
   if (queryError) {
+    handleQueryError(queryError, ['services'])
     setError(queryError.message)
   }
 
@@ -115,8 +125,8 @@ export default function ServicesPage() {
       // Reload services
       refetch()
     } catch (err: any) {
-      console.error('Delete error:', err)
-      alert('Failed to delete service: ' + err.message)
+      reportError(err, { action: 'delete_service', serviceId })
+      setError('Failed to delete service: ' + err.message)
     }
   }
 
@@ -131,7 +141,8 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="p-8">
+    <SentryErrorBoundaryClass>
+      <div className="p-8">
       {/* Header */}
       <div className="mb-8">
         <Link
@@ -257,5 +268,6 @@ export default function ServicesPage() {
         </div>
       )}
     </div>
+    </SentryErrorBoundaryClass>
   )
 }

@@ -53,7 +53,16 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const handleCompanySelect = (company: Company) => {
     setSelectedCompany(company)
     setShowCompanyDropdown(false)
-    // TODO: Update session to target this company
+    
+    // Store selected company in sessionStorage for persistence
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('superAdminSelectedCompany', JSON.stringify(company))
+    }
+    
+    // In a full implementation, you might also:
+    // - Update server-side session context
+    // - Refresh data scoped to the selected company
+    // - Update URL parameters to reflect the selection
   }
 
   const handleLogout = async () => {

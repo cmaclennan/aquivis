@@ -8,11 +8,19 @@ export default async function SettingsPage() {
   
   const { data: { user } } = await supabase.auth.getUser()
   
+  if (!user) {
+    redirect('/login')
+  }
+  
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
+
+  if (!profile?.company_id) {
+    redirect('/onboarding')
+  }
 
   // Only owners and managers can access settings
   if (profile?.role !== 'owner' && profile?.role !== 'manager') {

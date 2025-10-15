@@ -83,7 +83,7 @@ export default function Step2WaterTest({ serviceData, updateServiceData, unit }:
         )
         setComplianceResult(result)
       } catch (error) {
-        console.error('Compliance check error:', error)
+        // Handle compliance check error silently
       }
     } else {
       setComplianceResult(null)

@@ -48,7 +48,14 @@ export default function NewJobPage() {
         if (!newCustomer.name.trim()) throw new Error('Customer name is required')
         const { data: c, error: cErr } = await supabase
           .from('customers')
-          .insert({ company_id: profile.company_id, name: newCustomer.name.trim(), email: newCustomer.email || null, phone: newCustomer.phone || null, address: newCustomer.address || null })
+          .insert({ 
+            company_id: profile.company_id, 
+            name: newCustomer.name.trim(), 
+            email: newCustomer.email || null, 
+            phone: newCustomer.phone || null, 
+            address: newCustomer.address || null,
+            customer_type: 'property_owner' // Add required field
+          })
           .select('id')
           .single()
         if (cErr) throw cErr

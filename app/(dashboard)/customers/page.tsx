@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { Plus, Users, Mail, Phone, Building2 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -7,12 +8,20 @@ export default async function CustomersPage() {
   
   const { data: { user } } = await supabase.auth.getUser()
   
+  if (!user) {
+    redirect('/login')
+  }
+  
   // Get user's company
   const { data: profile } = await supabase
     .from('profiles')
     .select('company_id')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
+
+  if (!profile?.company_id) {
+    redirect('/onboarding')
+  }
 
   // Get all customers for this company
   const { data: customers } = await supabase
@@ -22,7 +31,7 @@ export default async function CustomersPage() {
       units:units(count),
       properties:properties(count)
     `)
-    .eq('company_id', profile!.company_id)
+    .eq('company_id', profile.company_id)
     .order('name')
 
   const hasCustomers = customers && customers.length > 0

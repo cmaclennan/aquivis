@@ -361,7 +361,7 @@ export default function ReportsClient() {
       link.click()
       URL.revokeObjectURL(url)
     } catch (e) {
-      console.error('Billing export failed', e)
+      setError('Billing export failed: ' + (e as Error).message)
     }
   }
 
@@ -432,7 +432,7 @@ export default function ReportsClient() {
       link.click()
       URL.revokeObjectURL(url)
     } catch (e) {
-      console.error('Equipment export failed', e)
+      setError('Equipment export failed: ' + (e as Error).message)
     }
   }
 

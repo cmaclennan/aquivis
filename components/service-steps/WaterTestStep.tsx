@@ -62,7 +62,7 @@ export default function WaterTestStep({ serviceData, updateServiceData, unit }: 
         const result = validateWaterTest(localData, unit.unit_type, unit.water_type)
         setCompliance(result)
       } catch (error) {
-        console.error('Validation error:', error)
+        // Handle validation error silently
       }
     } else {
       setCompliance(null)

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { User, Mail, Phone, Calendar, Shield, Edit } from 'lucide-react'
 
 export default async function ProfilePage() {
@@ -6,11 +7,19 @@ export default async function ProfilePage() {
   
   const { data: { user } } = await supabase.auth.getUser()
   
+  if (!user) {
+    redirect('/login')
+  }
+  
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
+
+  if (!profile?.company_id) {
+    redirect('/onboarding')
+  }
 
   return (
     <div className="p-8">
@@ -57,7 +66,7 @@ export default async function ProfilePage() {
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                       profile?.role === 'owner' 
                         ? 'bg-purple-100 text-purple-800'
-                        : profile?.role === 'manager'
+                        : profile?.role === 'super_admin'
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-green-100 text-green-800'
                     }`}>

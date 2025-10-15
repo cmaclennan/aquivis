@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Edit, Calendar, User, Droplets, AlertTriangle, CheckCircle, Building2 } from 'lucide-react'
 
@@ -14,12 +14,20 @@ export default async function ServiceDetailPage({
   
   const { data: { user } } = await supabase.auth.getUser()
   
+  if (!user) {
+    redirect('/login')
+  }
+  
   // Get user's company
   const { data: profile } = await supabase
     .from('profiles')
     .select('company_id')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
+
+  if (!profile?.company_id) {
+    redirect('/onboarding')
+  }
 
   // Get service with all related data
   const { data: service, error } = await supabase

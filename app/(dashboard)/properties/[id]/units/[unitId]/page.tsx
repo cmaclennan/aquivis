@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Droplets, Gauge, Beaker, Wrench, ClipboardList, Calendar } from 'lucide-react'
 import ServiceHistory from '@/components/ServiceHistory'
@@ -17,12 +17,20 @@ export default async function UnitDetailPage({
   
   const { data: { user } } = await supabase.auth.getUser()
   
+  if (!user) {
+    redirect('/login')
+  }
+  
   // Get user's company
   const { data: profile } = await supabase
     .from('profiles')
     .select('company_id')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
+
+  if (!profile?.company_id) {
+    redirect('/onboarding')
+  }
 
   // Get unit with property info
   const { data: unit, error } = await supabase
@@ -55,10 +63,19 @@ export default async function UnitDetailPage({
     customSchedule = data
   }
 
-  // TODO: Get latest service and equipment count
-  // For now, these are placeholders
-  const latestService = null
-  const equipmentCount = 0
+  // Get latest service and equipment count
+  const { data: latestService } = await supabase
+    .from('services')
+    .select('id, service_date, service_type, status, technician_name')
+    .eq('unit_id', unitId)
+    .order('service_date', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const { count: equipmentCount } = await supabase
+    .from('equipment')
+    .select('*', { count: 'exact', head: true })
+    .eq('unit_id', unitId)
 
   return (
     <div className="p-8">
@@ -167,8 +184,30 @@ export default async function UnitDetailPage({
             </div>
             
             {latestService ? (
-              <div>
-                {/* TODO: Service list */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {latestService.service_type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {new Date(latestService.service_date).toLocaleDateString('en-AU')}
+                    </p>
+                  </div>
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    latestService.status === 'completed' ? 'bg-green-100 text-green-800' :
+                    latestService.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {latestService.status.replace('_', ' ')}
+                  </span>
+                </div>
+                <Link
+                  href={`/services/${latestService.id}`}
+                  className="block text-sm text-primary hover:text-primary-600"
+                >
+                  View Details →
+                </Link>
               </div>
             ) : (
               <div className="flex min-h-[150px] items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
@@ -224,7 +263,7 @@ export default async function UnitDetailPage({
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="mb-4 text-sm font-semibold text-gray-900">Equipment</h3>
             
-            {equipmentCount > 0 ? (
+            {(equipmentCount || 0) > 0 ? (
               <div>
                 <p className="text-2xl font-bold text-gray-900">{equipmentCount}</p>
                 <p className="text-sm text-gray-600">pieces of equipment</p>

@@ -1,24 +1,41 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { Building2, CheckCircle2, User, Calendar, Clock, AlertTriangle, TrendingUp, Plus, Droplets } from 'lucide-react'
-import AquivisReadyDialog from '@/components/AquivisReadyDialog'
 import Link from 'next/link'
+import { SentryErrorBoundaryClass } from '@/components/ui/sentry-error-boundary'
+import { trackPageLoad } from '@/lib/performance-monitoring'
 
 export default async function DashboardPage() {
+  const trackLoad = trackPageLoad('dashboard')
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
   
+  if (!user) {
+    redirect('/login')
+  }
+  
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
+
+  if (!profile?.company_id) {
+    return (
+      <div className="p-8">
+        <div className="text-center py-8">
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   // Use optimized dashboard view for maximum performance
   const { data: dashboardStats } = await supabase
     .from('dashboard_stats_optimized')
     .select('*')
-    .eq('company_id', profile!.company_id)
+    .eq('company_id', profile.company_id)
     .single()
 
   // Get additional data for recent services and upcoming bookings using optimized views
@@ -30,7 +47,7 @@ export default async function DashboardPage() {
     supabase
       .from('services_optimized')
       .select('*')
-      .eq('company_id', profile!.company_id)
+      .eq('company_id', profile.company_id)
       .order('created_at', { ascending: false })
       .limit(5),
     
@@ -45,7 +62,7 @@ export default async function DashboardPage() {
           properties!inner(name, company_id)
         )
       `)
-      .eq('units.properties.company_id', profile!.company_id)
+      .eq('units.properties.company_id', profile.company_id)
       .eq('check_in_date', new Date().toISOString().split('T')[0])
       .order('check_in_time', { ascending: true })
       .limit(5)
@@ -57,63 +74,13 @@ export default async function DashboardPage() {
   const hasServices = (dashboardStats?.week_services ?? 0) > 0 // Use week_services instead of today_services
   const allStepsComplete = hasProperties && hasUnits && hasServices
 
+  // Track page load completion
+  trackLoad()
+
   return (
-    <div className="space-y-6">
-      {/* Quick Start Progress */}
-      {!allStepsComplete && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-blue-900 mb-4">Quick Start Progress</h2>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-3">
-              {hasProperties ? (
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-              ) : (
-                <div className="h-5 w-5 rounded-full border-2 border-blue-300" />
-              )}
-              <span className={hasProperties ? 'text-green-700' : 'text-blue-700'}>
-                {hasProperties ? 'Properties added' : 'Add your first property'}
-              </span>
-              {!hasProperties && (
-                <Link href="/properties/new" className="text-blue-600 hover:text-blue-800 underline">
-                  Add Property
-                </Link>
-              )}
-            </div>
-
-            <div className="flex items-center space-x-3">
-              {hasUnits ? (
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-              ) : (
-                <div className="h-5 w-5 rounded-full border-2 border-blue-300" />
-              )}
-              <span className={hasUnits ? 'text-green-700' : 'text-blue-700'}>
-                {hasUnits ? 'Units configured' : 'Add units to your properties'}
-              </span>
-              {!hasUnits && hasProperties && (
-                <Link href="/properties/new" className="text-blue-600 hover:text-blue-800 underline">
-                  Add Unit
-                </Link>
-              )}
-            </div>
-
-            <div className="flex items-center space-x-3">
-              {hasServices ? (
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-              ) : (
-                <div className="h-5 w-5 rounded-full border-2 border-blue-300" />
-              )}
-              <span className={hasServices ? 'text-green-700' : 'text-blue-700'}>
-                {hasServices ? 'Services scheduled' : 'Schedule your first service'}
-              </span>
-              {!hasServices && hasUnits && (
-                <Link href="/services/new" className="text-blue-600 hover:text-blue-800 underline">
-                  Schedule Service
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+    <SentryErrorBoundaryClass>
+      <div className="p-8">
+      <div className="space-y-6">
 
       {/* Dashboard Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -125,7 +92,7 @@ export default async function DashboardPage() {
               <p className="text-2xl font-bold text-gray-900">{dashboardStats?.property_count ?? 0}</p>
             </div>
             <Building2 className="h-8 w-8 text-blue-600" />
-          </div>
+            </div>
           <div className="mt-4">
             <Link 
               href="/properties" 
@@ -133,7 +100,7 @@ export default async function DashboardPage() {
             >
               View Properties →
             </Link>
-          </div>
+            </div>
         </div>
 
         {/* Units */}
@@ -144,7 +111,7 @@ export default async function DashboardPage() {
               <p className="text-2xl font-bold text-gray-900">{dashboardStats?.unit_count ?? 0}</p>
             </div>
             <Droplets className="h-8 w-8 text-green-600" />
-          </div>
+            </div>
           <div className="mt-4">
             <Link 
               href="/properties" 
@@ -152,7 +119,7 @@ export default async function DashboardPage() {
             >
               View Properties →
             </Link>
-          </div>
+            </div>
         </div>
 
         {/* Today's Services */}
@@ -163,7 +130,7 @@ export default async function DashboardPage() {
               <p className="text-2xl font-bold text-gray-900">{dashboardStats?.today_services ?? 0}</p>
             </div>
             <Calendar className="h-8 w-8 text-purple-600" />
-          </div>
+            </div>
           <div className="mt-4">
             <Link 
               href="/services" 
@@ -171,8 +138,8 @@ export default async function DashboardPage() {
             >
               View Services →
             </Link>
-          </div>
         </div>
+      </div>
 
         {/* This Week's Services */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -190,9 +157,9 @@ export default async function DashboardPage() {
             >
               View All →
             </Link>
+            </div>
+            </div>
           </div>
-        </div>
-      </div>
 
       {/* Water Quality Issues */}
       {dashboardStats?.water_quality_issues && dashboardStats.water_quality_issues > 0 && (
@@ -205,7 +172,7 @@ export default async function DashboardPage() {
                 {dashboardStats.water_quality_issues} service{dashboardStats.water_quality_issues !== 1 ? 's' : ''} with water quality issues need attention.
               </p>
             </div>
-          </div>
+              </div>
           <div className="mt-4">
             <Link 
               href="/services?filter=water_quality_issues" 
@@ -213,8 +180,8 @@ export default async function DashboardPage() {
             >
               Review Issues
             </Link>
-          </div>
-        </div>
+              </div>
+            </div>
       )}
 
       {/* Recent Activity */}
@@ -234,7 +201,7 @@ export default async function DashboardPage() {
           </div>
           <div className="p-6">
             {recentServices && recentServices.length > 0 ? (
-              <div className="space-y-4">
+          <div className="space-y-4">
                 {recentServices.map((service: any) => (
                   <div key={service.id} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
@@ -250,8 +217,8 @@ export default async function DashboardPage() {
                         <p className="text-xs text-gray-500">
                           {service.technician_name} • {new Date(service.service_date).toLocaleDateString()}
                         </p>
-                      </div>
-                    </div>
+              </div>
+            </div>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       service.status === 'completed' ? 'bg-green-100 text-green-800' :
                       service.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
@@ -264,9 +231,9 @@ export default async function DashboardPage() {
               </div>
             ) : (
               <p className="text-gray-500 text-center py-4">No recent services</p>
-            )}
-          </div>
-        </div>
+                )}
+              </div>
+            </div>
 
         {/* Upcoming Bookings */}
         <div className="bg-white rounded-lg shadow-sm border">
@@ -280,7 +247,7 @@ export default async function DashboardPage() {
                 View Schedule
               </Link>
             </div>
-          </div>
+              </div>
           <div className="p-6">
             {upcomingBookings && upcomingBookings.length > 0 ? (
               <div className="space-y-4">
@@ -294,8 +261,8 @@ export default async function DashboardPage() {
                         </p>
                         <p className="text-xs text-gray-500">
                           Check-in: {booking.check_in_time}
-                        </p>
-                      </div>
+                </p>
+              </div>
                     </div>
                     <span className="text-xs text-gray-500">
                       {booking.guest_name}
@@ -306,9 +273,9 @@ export default async function DashboardPage() {
             ) : (
               <p className="text-gray-500 text-center py-4">No check-ins today</p>
             )}
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow-sm border p-6">
@@ -338,10 +305,10 @@ export default async function DashboardPage() {
             <span className="text-sm font-medium text-gray-900">Add Customer</span>
           </Link>
         </div>
-      </div>
+        </div>
 
-      {/* Aquivis Ready Dialog */}
-      <AquivisReadyDialog />
+      </div>
     </div>
+    </SentryErrorBoundaryClass>
   )
 }

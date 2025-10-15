@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { Users, UserPlus, Mail, Phone, Calendar, Shield } from 'lucide-react'
 
 export default async function TeamPage() {
@@ -6,17 +7,25 @@ export default async function TeamPage() {
   
   const { data: { user } } = await supabase.auth.getUser()
   
+  if (!user) {
+    redirect('/login')
+  }
+  
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
+
+  if (!profile?.company_id) {
+    redirect('/onboarding')
+  }
 
   // Get all team members for this company
   const { data: teamMembers } = await supabase
     .from('profiles')
     .select('*')
-    .eq('company_id', profile!.company_id)
+    .eq('company_id', profile.company_id)
     .order('created_at', { ascending: false })
 
   const canManageTeam = profile?.role === 'owner' || profile?.role === 'manager'

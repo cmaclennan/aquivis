@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Users, MapPin, Phone, Mail, CreditCard, Building2, Droplets } from 'lucide-react'
 
@@ -15,12 +15,20 @@ export default async function CustomerDetailPage({
   
   const { data: { user } } = await supabase.auth.getUser()
   
+  if (!user) {
+    redirect('/login')
+  }
+  
   // Get user's company
   const { data: profile } = await supabase
     .from('profiles')
     .select('company_id')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
+
+  if (!profile?.company_id) {
+    redirect('/onboarding')
+  }
 
   // Get customer with related data
   const { data: customer, error } = await supabase
@@ -165,7 +173,7 @@ export default async function CustomerDetailPage({
             <div className="pt-4 border-t border-gray-200">
               <p className="text-xs text-gray-500">Created</p>
               <p className="text-sm text-gray-700">
-                {new Date(customer.created_at).toLocaleDateString('en-AU')}
+                {customer.created_at ? new Date(customer.created_at).toLocaleDateString('en-AU') : 'N/A'}
               </p>
             </div>
           </div>

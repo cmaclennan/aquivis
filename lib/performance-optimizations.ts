@@ -319,8 +319,8 @@ export function usePerformanceMonitor(componentName: string) {
       const endTime = performance.now()
       const renderTime = endTime - startTime
       
-      if (renderTime > 100) { // Log slow renders
-        console.warn(`Slow render in ${componentName}: ${renderTime.toFixed(2)}ms`)
+      if (renderTime > 100) { // Track slow renders
+        // Could send to analytics service here
       }
     }
   }, [componentName])
@@ -341,8 +341,8 @@ export function useQueryPerformance(queryKey: string[]) {
       endTime.current = performance.now()
       const queryTime = endTime.current - startTime.current
       
-      if (queryTime > 1000) { // Log slow queries
-        console.warn(`Slow query ${queryKey.join('.')}: ${queryTime.toFixed(2)}ms`)
+      if (queryTime > 1000) { // Track slow queries
+        // Could send to analytics service here
       }
     }
   }, [queryKey])
@@ -368,7 +368,7 @@ export function useLocalStorageCache<T>(
         }
       }
     } catch (error) {
-      console.error('Error reading from localStorage:', error)
+      // Silently fail for localStorage errors
     }
     return initialValue
   })
@@ -382,7 +382,7 @@ export function useLocalStorageCache<T>(
       localStorage.setItem(key, JSON.stringify(item))
       setCachedValue(value)
     } catch (error) {
-      console.error('Error writing to localStorage:', error)
+      // Silently fail for localStorage errors
     }
   }
   

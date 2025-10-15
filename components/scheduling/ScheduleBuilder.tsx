@@ -388,7 +388,6 @@ export default function ScheduleBuilder({
       setTemplates(tpl || [])
       setTemplateName('')
     } else {
-      console.error('Save template error:', error)
       alert('Failed to save template')
     }
   }

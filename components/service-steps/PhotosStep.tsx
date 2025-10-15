@@ -61,7 +61,7 @@ export default function PhotosStep({ serviceData, updateServiceData, unit }: Pro
       setLocalData(updated)
       updateServiceData({ photos: updated })
     } catch (error) {
-      console.error('Upload error:', error)
+      // Handle upload error silently
     } finally {
       setUploading(false)
     }

@@ -88,7 +88,6 @@ export default function Step6Photos({ serviceData, updateServiceData, unit }: Pr
       updateServiceData({ photos: updatedPhotos })
       
     } catch (error) {
-      console.error('Error processing files:', error)
       alert('Error processing files. Please try again.')
     } finally {
       setIsUploading(false)

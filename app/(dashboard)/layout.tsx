@@ -110,7 +110,7 @@ export default async function DashboardLayout({
             <BarChart3 className="h-5 w-5" />
             <span>Reports</span>
           </Link>
-          {(profile.role === 'owner' || profile.role === 'manager') && (
+          {(profile.role === 'owner' || profile.role === 'super_admin') && (
             <Link
               href="/settings"
               className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"

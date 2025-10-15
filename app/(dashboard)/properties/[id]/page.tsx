@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Building2, MapPin, Phone, Mail, User, Plus, Droplets, Calendar } from 'lucide-react'
 import { formatLitresShort } from '@/lib/utils'
@@ -16,11 +16,15 @@ export default async function PropertyDetailPage({
   
   const { data: { user } } = await supabase.auth.getUser()
   
+  if (!user) {
+    redirect('/login')
+  }
+  
   // Get user's company
   const { data: profile } = await supabase
     .from('profiles')
     .select('company_id')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
 
   // Get property with units and customer info

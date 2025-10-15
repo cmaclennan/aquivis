@@ -37,7 +37,7 @@ export default function EditPlantRoomPage({ params }: { params: Promise<{ id: st
             0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday', 6: 'saturday',
           }
           const normalized = typeof days[0] === 'number' ? days.map((n: number) => intToDay[n] ?? '') : days
-          setCheckDays(normalized.filter(Boolean))
+           setCheckDays(normalized.filter(Boolean) as string[])
         } else {
           setCheckDays([])
         }

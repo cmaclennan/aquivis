@@ -40,8 +40,6 @@ function SignupInner() {
     }
 
     try {
-      console.log('🔍 SIGNUP DEBUG - Starting signup process:', debugData)
-      
       // Create auth user (trigger will auto-create profile)
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -70,25 +68,19 @@ function SignupInner() {
         errorStatus: signUpError?.status
       }
 
-      console.log('🔍 SIGNUP DEBUG - Response received:', enhancedDebug)
       setDebugInfo(enhancedDebug)
 
       if (signUpError) {
-        console.error('❌ SIGNUP DEBUG - Signup error:', signUpError)
         throw signUpError
       }
 
       if (data.user) {
-        console.log('✅ SIGNUP DEBUG - User created successfully:', data.user.id)
-        
         // Check if email confirmation is required
         if (data.user.identities && data.user.identities.length === 0) {
           // Email confirmation required
-          console.log('📧 SIGNUP DEBUG - Email confirmation required')
           setSuccess(true)
         } else {
           // No confirmation needed (or already confirmed)
-          console.log('✅ SIGNUP DEBUG - No confirmation needed, creating profile...')
           
           // Create profile manually since trigger has timing issues
           const { data: profileResult, error: profileError } = await supabase
@@ -100,20 +92,14 @@ function SignupInner() {
             })
           
           if (profileError) {
-            console.error('❌ SIGNUP DEBUG - Profile creation failed:', profileError)
             setError('Failed to create user profile. Please try again.')
           } else {
-            console.log('✅ SIGNUP DEBUG - Profile created successfully, redirecting to onboarding')
             const redirect = params.get('redirect')
             router.push(redirect || '/onboarding')
           }
         }
-      } else {
-        console.log('⚠️ SIGNUP DEBUG - No user in response data')
       }
     } catch (err: any) {
-      console.error('❌ SIGNUP DEBUG - Exception caught:', err)
-      
       const errorDebug = {
         ...debugData,
         step: 'exception_caught',
@@ -126,7 +112,6 @@ function SignupInner() {
         errorStack: err.stack
       }
       
-      console.error('❌ SIGNUP DEBUG - Full error details:', errorDebug)
       setDebugInfo(errorDebug)
       setError(err.message || 'Failed to create account')
     } finally {
