@@ -47,39 +47,16 @@ export default function ServicesPage() {
 
       if (!profile?.company_id) throw new Error('No company found')
 
-      // Try optimized view first, fallback to basic query if not available
-      let data, error
-      try {
-        const result = await supabase
-          .from('services_optimized')
-          .select('*')
-          .eq('company_id', profile.company_id)
-          .order('service_date', { ascending: false })
-          .limit(50)
-        data = result.data
-        error = result.error
-      } catch (viewError) {
-        // Fallback to basic services query if optimized view doesn't exist
-        const result = await supabase
-          .from('services')
-          .select(`
-            *,
-            units!inner(
-              name,
-              unit_type,
-              properties!inner(name, company_id)
-            )
-          `)
-          .eq('units.properties.company_id', profile.company_id)
-          .order('service_date', { ascending: false })
-          .limit(50)
-        data = result.data
-        error = result.error
-      }
+      const { data, error } = await supabase
+        .from('services_optimized')
+        .select('*')
+        .eq('company_id', profile.company_id)
+        .order('service_date', { ascending: false })
+        .limit(50)
 
       if (error) throw error
       
-      // Data is already normalized from the optimized view or needs transformation from basic query
+      // Data is already normalized from the optimized view
       return (data || []) as Service[]
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
