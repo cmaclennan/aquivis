@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { Building2, CheckCircle2, User, Check, Calendar, Clock, AlertTriangle, TrendingUp, Plus, Droplets } from 'lucide-react'
+import { Building2, CheckCircle2, User, Calendar, Clock, AlertTriangle, TrendingUp, Plus, Droplets } from 'lucide-react'
 import AquivisReadyDialog from '@/components/AquivisReadyDialog'
 import Link from 'next/link'
 
@@ -54,7 +54,7 @@ export default async function DashboardPage() {
   // Calculate quick start progress using optimized data
   const hasProperties = (dashboardStats?.property_count ?? 0) > 0
   const hasUnits = (dashboardStats?.unit_count ?? 0) > 0
-  const hasServices = (dashboardStats?.today_services ?? 0) > 0
+  const hasServices = (dashboardStats?.week_services ?? 0) > 0 // Use week_services instead of today_services
   const allStepsComplete = hasProperties && hasUnits && hasServices
 
   return (
@@ -78,7 +78,7 @@ export default async function DashboardPage() {
                   Add Property
                 </Link>
               )}
-      </div>
+            </div>
 
             <div className="flex items-center space-x-3">
               {hasUnits ? (
@@ -90,11 +90,11 @@ export default async function DashboardPage() {
                 {hasUnits ? 'Units configured' : 'Add units to your properties'}
               </span>
               {!hasUnits && hasProperties && (
-                <Link href="/units/new" className="text-blue-600 hover:text-blue-800 underline">
+                <Link href="/properties/new" className="text-blue-600 hover:text-blue-800 underline">
                   Add Unit
                 </Link>
-          )}
-        </div>
+              )}
+            </div>
 
             <div className="flex items-center space-x-3">
               {hasServices ? (
@@ -125,7 +125,7 @@ export default async function DashboardPage() {
               <p className="text-2xl font-bold text-gray-900">{dashboardStats?.property_count ?? 0}</p>
             </div>
             <Building2 className="h-8 w-8 text-blue-600" />
-            </div>
+          </div>
           <div className="mt-4">
             <Link 
               href="/properties" 
@@ -133,7 +133,7 @@ export default async function DashboardPage() {
             >
               View Properties →
             </Link>
-            </div>
+          </div>
         </div>
 
         {/* Units */}
@@ -144,16 +144,16 @@ export default async function DashboardPage() {
               <p className="text-2xl font-bold text-gray-900">{dashboardStats?.unit_count ?? 0}</p>
             </div>
             <Droplets className="h-8 w-8 text-green-600" />
-            </div>
+          </div>
           <div className="mt-4">
             <Link 
-              href="/units" 
+              href="/properties" 
               className="text-sm text-green-600 hover:text-green-800 font-medium"
             >
-              View Units →
+              View Properties →
             </Link>
+          </div>
         </div>
-      </div>
 
         {/* Today's Services */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -163,7 +163,7 @@ export default async function DashboardPage() {
               <p className="text-2xl font-bold text-gray-900">{dashboardStats?.today_services ?? 0}</p>
             </div>
             <Calendar className="h-8 w-8 text-purple-600" />
-            </div>
+          </div>
           <div className="mt-4">
             <Link 
               href="/services" 
@@ -171,8 +171,8 @@ export default async function DashboardPage() {
             >
               View Services →
             </Link>
-            </div>
           </div>
+        </div>
 
         {/* This Week's Services */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -190,9 +190,9 @@ export default async function DashboardPage() {
             >
               View All →
             </Link>
-              </div>
-              </div>
-            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Water Quality Issues */}
       {dashboardStats?.water_quality_issues && dashboardStats.water_quality_issues > 0 && (
@@ -264,9 +264,9 @@ export default async function DashboardPage() {
               </div>
             ) : (
               <p className="text-gray-500 text-center py-4">No recent services</p>
-                )}
-              </div>
-            </div>
+            )}
+          </div>
+        </div>
 
         {/* Upcoming Bookings */}
         <div className="bg-white rounded-lg shadow-sm border">
@@ -274,13 +274,13 @@ export default async function DashboardPage() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Today's Check-ins</h3>
               <Link 
-                href="/bookings" 
+                href="/schedule" 
                 className="text-sm text-blue-600 hover:text-blue-800 font-medium"
               >
-                View All
+                View Schedule
               </Link>
             </div>
-              </div>
+          </div>
           <div className="p-6">
             {upcomingBookings && upcomingBookings.length > 0 ? (
               <div className="space-y-4">
@@ -294,8 +294,8 @@ export default async function DashboardPage() {
                         </p>
                         <p className="text-xs text-gray-500">
                           Check-in: {booking.check_in_time}
-                </p>
-              </div>
+                        </p>
+                      </div>
                     </div>
                     <span className="text-xs text-gray-500">
                       {booking.guest_name}
@@ -306,9 +306,9 @@ export default async function DashboardPage() {
             ) : (
               <p className="text-gray-500 text-center py-4">No check-ins today</p>
             )}
-            </div>
           </div>
         </div>
+      </div>
 
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow-sm border p-6">
@@ -337,7 +337,7 @@ export default async function DashboardPage() {
             <User className="h-5 w-5 text-purple-600" />
             <span className="text-sm font-medium text-gray-900">Add Customer</span>
           </Link>
-      </div>
+        </div>
       </div>
 
       {/* Aquivis Ready Dialog */}
