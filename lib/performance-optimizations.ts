@@ -5,6 +5,7 @@
 // Priority: HIGH - Critical for user experience
 // Date: 2025-01-14
 
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
