@@ -424,22 +424,4 @@ export function useOptimizedFilter<T>(
 // 8. EXPORT ALL HOOKS
 // ============================================
 
-export {
-  useDashboardStats,
-  useServices,
-  useProperties,
-  useUnits,
-  useCustomers,
-  useCreateService,
-  useUpdateService,
-  useDeleteService,
-  useDebounce,
-  useMemoizedData,
-  useVirtualization,
-  usePagination,
-  usePerformanceMonitor,
-  useQueryPerformance,
-  useLocalStorageCache,
-  useDataTransformations,
-  useOptimizedFilter,
-}
+// Note: All hooks are exported inline above
