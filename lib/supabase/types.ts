@@ -1,3 +1,8 @@
+// Minimal placeholder for Supabase generated types to avoid runtime import errors.
+// Replace with actual generated types when available.
+
+export type Database = Record<string, unknown>;
+
 export type Json =
   | string
   | number

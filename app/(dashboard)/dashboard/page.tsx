@@ -59,34 +59,89 @@ export default async function DashboardPage() {
   }
 
   // Get additional data for recent services and upcoming bookings using optimized views
-  const [
-    { data: recentServices },
-    { data: upcomingBookings }
-  ] = await Promise.all([
-    // Recent services (last 5) using optimized view
-    supabase
-      .from('services_optimized')
-      .select('*')
-      .eq('company_id', profile.company_id)
-      .order('created_at', { ascending: false })
-      .limit(5),
+  let recentServices = null
+  let upcomingBookings = null
+  
+  try {
+    const [
+      { data: recentServicesData },
+      { data: upcomingBookingsData }
+    ] = await Promise.all([
+      // Recent services (last 5) using optimized view
+      supabase
+        .from('services_optimized')
+        .select('*')
+        .eq('company_id', profile.company_id)
+        .order('created_at', { ascending: false })
+        .limit(5),
+      
+      // Upcoming bookings (today's check-ins)
+      supabase
+        .from('bookings')
+        .select(`
+          *,
+          units!inner(
+            name,
+            unit_number,
+            properties!inner(name, company_id)
+          )
+        `)
+        .eq('units.properties.company_id', profile.company_id)
+        .eq('check_in_date', new Date().toISOString().split('T')[0])
+        .order('check_in_time', { ascending: true })
+        .limit(5)
+    ])
     
-    // Upcoming bookings (today's check-ins)
-    supabase
-      .from('bookings')
-      .select(`
-        *,
-        units!inner(
-          name,
-          unit_number,
-          properties!inner(name, company_id)
-        )
-      `)
-      .eq('units.properties.company_id', profile.company_id)
-      .eq('check_in_date', new Date().toISOString().split('T')[0])
-      .order('check_in_time', { ascending: true })
-      .limit(5)
-  ])
+    recentServices = recentServicesData
+    upcomingBookings = upcomingBookingsData
+  } catch (error) {
+    console.warn('Optimized views not available, using fallback queries')
+    // Fallback to basic queries if optimized views don't exist
+    try {
+      const [
+        { data: recentServicesFallback },
+        { data: upcomingBookingsFallback }
+      ] = await Promise.all([
+        // Fallback: Basic services query
+        supabase
+          .from('services')
+          .select(`
+            *,
+            units!inner(
+              name,
+              unit_type,
+              properties!inner(name, company_id)
+            )
+          `)
+          .eq('units.properties.company_id', profile.company_id)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        
+        // Fallback: Basic bookings query
+        supabase
+          .from('bookings')
+          .select(`
+            *,
+            units!inner(
+              name,
+              unit_number,
+              properties!inner(name, company_id)
+            )
+          `)
+          .eq('units.properties.company_id', profile.company_id)
+          .eq('check_in_date', new Date().toISOString().split('T')[0])
+          .order('check_in_time', { ascending: true })
+          .limit(5)
+      ])
+      
+      recentServices = recentServicesFallback
+      upcomingBookings = upcomingBookingsFallback
+    } catch (fallbackError) {
+      console.error('Fallback queries also failed:', fallbackError)
+      recentServices = []
+      upcomingBookings = []
+    }
+  }
 
   // Calculate quick start progress using optimized data
   const hasProperties = (dashboardStats?.property_count ?? 0) > 0

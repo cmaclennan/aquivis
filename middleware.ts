@@ -38,19 +38,35 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession()
 
-  // Define protected routes
+  // Define protected routes (all main app areas)
   const protectedRoutes = [
     '/dashboard',
     '/customers',
     '/properties',
+    '/services',
+    '/jobs',
+    '/reports',
+    '/team',
+    '/profile',
+    '/settings',
+    '/management',
+    '/schedule',
+    '/equipment',
+    '/super-admin',
+    '/templates',
     '/onboarding',
   ]
 
   // Define public routes that don't require authentication
   const publicRoutes = [
+    '/',
     '/login',
     '/signup',
-    '/',
+    '/customer-portal',
+    '/customer-portal/login',
+    '/super-admin-login',
+    '/invite/accept',
+    '/style-guide',
   ]
 
   const { pathname } = req.nextUrl

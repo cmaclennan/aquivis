@@ -51,3 +51,6 @@ Thumbs.db
 *.log
 .cache/
 
+
+# Sentry Config File
+.env.sentry-build-plugin
