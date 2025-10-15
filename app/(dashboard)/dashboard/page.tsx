@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation'
 import { Building2, CheckCircle2, User, Calendar, Clock, AlertTriangle, TrendingUp, Plus, Droplets } from 'lucide-react'
 import Link from 'next/link'
 import { SentryErrorBoundaryClass } from '@/components/ui/sentry-error-boundary'
-import { trackPageLoad } from '@/lib/performance-monitoring'
+import { PageLoadTracker } from '@/components/metrics/PageLoadTracker'
 
 export default async function DashboardPage() {
-  const trackLoad = trackPageLoad('dashboard')
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
@@ -149,12 +148,12 @@ export default async function DashboardPage() {
   const hasServices = (dashboardStats?.week_services ?? 0) > 0 // Use week_services instead of today_services
   const allStepsComplete = hasProperties && hasUnits && hasServices
 
-  // Track page load completion
-  trackLoad()
+  // Client-side performance tracker
 
   return (
     <SentryErrorBoundaryClass>
-      <div className="p-8">
+      <PageLoadTracker page="dashboard" />
+    <div className="p-8">
       <div className="space-y-6">
 
       {/* Dashboard Stats */}
