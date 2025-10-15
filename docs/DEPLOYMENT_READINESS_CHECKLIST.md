@@ -164,3 +164,10 @@ EMAIL_FROM=noreply@aquivis.app
 
 **Last Updated:** 2025-01-14  
 **Next Review:** After environment variable verification
+
+## P0 Cleanup (2025-10-16)
+- [x] Remove demo routes: `app/sentry-example-page/`, `app/api/sentry-example-api/`
+- [x] Remove backups: `app/page.backup.tsx`, `app/layout.backup.tsx`
+- [x] Move diagnostics to `scripts/ops/`
+- [ ] Generate Supabase types and remove placeholder
+- [ ] Enable strict TS and stop ignoring build errors (post-P1)
