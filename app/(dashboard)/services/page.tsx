@@ -8,6 +8,7 @@ import { ArrowLeft, Plus, Calendar, User, Droplets, AlertTriangle, CheckCircle, 
 import { SentryErrorBoundaryClass } from '@/components/ui/sentry-error-boundary'
 import { trackPageLoad } from '@/lib/performance-monitoring'
 import { handleQueryError, reportError } from '@/lib/sentry'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Service {
   id: string
@@ -25,6 +26,14 @@ interface Service {
 export default function ServicesPage() {
   const [error, setError] = useState<string | null>(null)
   const supabase = useMemo(() => createClient(), [])
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const pageParam = searchParams?.get('page') || '1'
+  const page = Math.max(1, Number(pageParam) || 1)
+  const pageSize = 24
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
   
   // Track page load
   useEffect(() => {
@@ -34,7 +43,7 @@ export default function ServicesPage() {
 
   // Use React Query for caching and performance
   const { data: services = [], isLoading: loading, error: queryError, refetch } = useQuery({
-    queryKey: ['services'],
+    queryKey: ['services', page],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -55,7 +64,7 @@ export default function ServicesPage() {
           .select('*')
           .eq('company_id', profile.company_id)
           .order('service_date', { ascending: false })
-          .limit(50)
+          .range(from, to)
         data = result.data
         error = result.error
       } catch (viewError) {
@@ -72,7 +81,7 @@ export default function ServicesPage() {
           `)
           .eq('units.properties.company_id', profile.company_id)
           .order('service_date', { ascending: false })
-          .limit(50)
+          .range(from, to)
         data = result.data
         error = result.error
       }
@@ -288,6 +297,25 @@ export default function ServicesPage() {
               </div>
             </div>
           ))}
+          {/* Pagination */}
+          <div className="flex items-center justify-center gap-4 mt-6">
+            {page > 1 && (
+              <button
+                onClick={() => router.push(`/services?page=${page - 1}`)}
+                className="text-sm text-gray-700 underline"
+              >
+                Previous
+              </button>
+            )}
+            {services.length === pageSize && (
+              <button
+                onClick={() => router.push(`/services?page=${page + 1}`)}
+                className="text-sm text-gray-700 underline"
+              >
+                Next
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
