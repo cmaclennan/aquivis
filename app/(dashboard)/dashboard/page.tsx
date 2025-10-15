@@ -32,11 +32,31 @@ export default async function DashboardPage() {
   }
 
   // Use optimized dashboard view for maximum performance
-  const { data: dashboardStats } = await supabase
-    .from('dashboard_stats_optimized')
-    .select('*')
-    .eq('company_id', profile.company_id)
-    .single()
+  // Fallback to basic stats if optimized view doesn't exist
+  let dashboardStats = null
+  try {
+    const { data: stats } = await supabase
+      .from('dashboard_stats_optimized')
+      .select('*')
+      .eq('company_id', profile.company_id)
+      .single()
+    dashboardStats = stats
+  } catch (error) {
+    // Fallback to basic dashboard stats if optimized view doesn't exist
+    console.warn('Optimized dashboard view not available, using fallback')
+    dashboardStats = {
+      company_id: profile.company_id,
+      company_name: profile.companies?.name || 'Company',
+      property_count: 0,
+      unit_count: 0,
+      today_services: 0,
+      week_services: 0,
+      total_services: 0,
+      water_quality_issues: 0,
+      today_bookings: 0,
+      recent_services: 0
+    }
+  }
 
   // Get additional data for recent services and upcoming bookings using optimized views
   const [
