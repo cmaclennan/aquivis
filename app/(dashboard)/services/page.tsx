@@ -95,10 +95,12 @@ export default function ServicesPage() {
     gcTime: 5 * 60 * 1000, // 5 minutes
   })
 
-  if (queryError) {
-    handleQueryError(queryError, ['services'])
-    setError(queryError.message)
-  }
+  useEffect(() => {
+    if (queryError) {
+      handleQueryError(queryError, ['services'])
+      setError((queryError as any)?.message || 'Failed to load services')
+    }
+  }, [queryError])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -248,7 +250,9 @@ export default function ServicesPage() {
                     {service.unit_name && (
                       <div className="flex items-center space-x-2">
                         <span className="font-medium">Unit:</span>
-                        <span>{service.unit_name} ({service.unit_type.replace('_', ' ')})</span>
+                        <span>
+                          {service.unit_name} ({String(service.unit_type || '').replace('_', ' ')})
+                        </span>
                       </div>
                     )}
                     
