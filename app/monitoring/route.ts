@@ -3,8 +3,7 @@ import type { NextRequest } from 'next/server'
 export const runtime = 'nodejs'
 
 function parseDsn(dsn: string) {
-  // DSN format: https://<public_key>@<host>/<project_id>
-  // Example: https://abc123@o4510.ingest.de.sentry.io/4510191704408144
+  // DSN format (generalized): https://PUBLIC_KEY@HOST/PROJECT_ID
   const url = new URL(dsn)
   const publicKey = url.username
   const host = url.host

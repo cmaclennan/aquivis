@@ -118,12 +118,14 @@ for (const file of sentryInitFiles) {
 }
 ok('Sentry init present only in expected files')
 
-// 4) Sentry tunnel enabled
+// 4) Sentry tunnel configured (either plugin tunnelRoute or runtime route)
 const nextConfig = fs.readFileSync('next.config.js', 'utf-8')
-if (!/tunnelRoute:\s*['"]\/monitoring['"]/.test(nextConfig)) {
-  fail('Sentry tunnelRoute not enabled at /monitoring in next.config.js')
+const hasPluginTunnel = /tunnelRoute:\s*['"]\/monitoring['"]/.test(nextConfig)
+const hasRuntimeTunnel = fs.existsSync(path.join('app', 'monitoring', 'route.ts'))
+if (!(hasPluginTunnel || hasRuntimeTunnel)) {
+  fail('Sentry tunnel not configured: expected plugin tunnelRoute or app/monitoring/route.ts')
 }
-ok('Sentry tunnel enabled in next.config.js')
+ok('Sentry tunnel configured (plugin or runtime route)')
 
 // 5) middleware excludes monitoring
 const middleware = fs.readFileSync('middleware.ts', 'utf-8')
