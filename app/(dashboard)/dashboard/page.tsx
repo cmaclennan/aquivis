@@ -42,7 +42,6 @@ export default async function DashboardPage() {
     dashboardStats = stats
   } catch (error) {
     // Fallback to basic dashboard stats if optimized view doesn't exist
-    console.warn('Optimized dashboard view not available, using fallback')
     dashboardStats = {
       company_id: profile.company_id,
       company_name: profile.companies?.name || 'Company',
@@ -94,7 +93,6 @@ export default async function DashboardPage() {
     recentServices = recentServicesData
     upcomingBookings = upcomingBookingsData
   } catch (error) {
-    console.warn('Optimized views not available, using fallback queries')
     // Fallback to basic queries if optimized views don't exist
     try {
       const [
@@ -136,7 +134,6 @@ export default async function DashboardPage() {
       recentServices = recentServicesFallback
       upcomingBookings = upcomingBookingsFallback
     } catch (fallbackError) {
-      console.error('Fallback queries also failed:', fallbackError)
       recentServices = []
       upcomingBookings = []
     }

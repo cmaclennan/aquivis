@@ -32,10 +32,7 @@ class PerformanceMonitor {
       page
     })
     
-    // Log slow page loads
-    if (loadTime > 2000) {
-      console.warn(`Slow page load: ${page} took ${loadTime.toFixed(2)}ms`)
-    }
+    // Optionally report slow page loads to monitoring here
   }
 
   // Track query performance
@@ -49,10 +46,7 @@ class PerformanceMonitor {
       page: queryName
     })
     
-    // Log slow queries
-    if (queryTime > 1000) {
-      console.warn(`Slow query: ${queryName} took ${queryTime.toFixed(2)}ms`)
-    }
+    // Optionally report slow queries to monitoring here
   }
 
   // Track render performance
@@ -66,10 +60,7 @@ class PerformanceMonitor {
       page: componentName
     })
     
-    // Log slow renders
-    if (renderTime > 100) {
-      console.warn(`Slow render: ${componentName} took ${renderTime.toFixed(2)}ms`)
-    }
+    // Optionally report slow renders to monitoring here
   }
 
   private addMetric(metric: PerformanceMetrics) {

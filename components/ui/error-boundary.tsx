@@ -24,10 +24,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log error to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error caught by boundary:', error, errorInfo)
-    }
+    // Optionally report to an error reporting service here
     
     // In production, you could send this to an error reporting service
     // like Sentry, LogRocket, etc.
@@ -75,10 +72,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 // Hook version for functional components
 export function useErrorHandler() {
   return (error: Error, errorInfo?: React.ErrorInfo) => {
-    // Log error in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error handled by hook:', error, errorInfo)
-    }
+    // Optionally report to an error reporting service here
     
     // In production, send to error reporting service
   }

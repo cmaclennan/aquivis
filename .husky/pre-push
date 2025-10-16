@@ -1,0 +1,3 @@
+#!/bin/sh
+. ./.husky/husky.sh
+npm run prepush:verify

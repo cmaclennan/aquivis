@@ -88,8 +88,8 @@ const sentryWebpackPluginOptions = {
   project: process.env.SENTRY_PROJECT,
   // Upload a larger set of source maps for prettier stack traces (increases build time)
   widenClientFileUpload: true,
-  // Disable tunnel to avoid 403s unless explicitly configured server-side
-  // tunnelRoute: '/monitoring',
+  // Enable Sentry tunnel to avoid adblock/region 403s
+  tunnelRoute: '/monitoring',
   // Automatically tree-shake Sentry logger statements to reduce bundle size
   disableLogger: true,
   // Enables automatic instrumentation of Vercel Cron Monitors
