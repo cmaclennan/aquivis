@@ -9,6 +9,7 @@ const DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 if (DSN) {
   Sentry.init({
     dsn: DSN,
+    tunnel: '/monitoring',
     tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.05 : 1,
     enableLogs: false,
     sendDefaultPii: false,
