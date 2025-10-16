@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "test:sentry:tunnel": "node scripts/test-sentry-tunnel.js",
     "prepush:verify": "node scripts/prepush-check.js",
     "prepare": "husky"
   },

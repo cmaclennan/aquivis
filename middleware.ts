@@ -7,6 +7,12 @@ export const runtime = 'nodejs'
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
+
+  // Avoid auth redirects on prefetch requests to prevent navigation bounce
+  const isPrefetch =
+    req.headers.get('x-middleware-prefetch') === '1' ||
+    req.headers.get('next-router-prefetch') === '1' ||
+    req.headers.get('purpose') === 'prefetch'
   
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -83,14 +89,25 @@ export async function middleware(req: NextRequest) {
 
   // If accessing a protected route without a session, redirect to login
   if (isProtectedRoute && !session) {
+    if (isPrefetch) {
+      return res
+    }
     const redirectUrl = new URL('/login', req.url)
     redirectUrl.searchParams.set('redirectedFrom', pathname)
-    return NextResponse.redirect(redirectUrl)
+    const redirectResponse = NextResponse.redirect(redirectUrl)
+    // Preserve any cookies set by Supabase during getSession (e.g., token refresh)
+    res.cookies.getAll().forEach((c) => redirectResponse.cookies.set(c))
+    return redirectResponse
   }
 
   // If accessing login/signup with a session, redirect to dashboard
   if ((pathname === '/login' || pathname === '/signup') && session) {
-    return NextResponse.redirect(new URL('/dashboard', req.url))
+    if (isPrefetch) {
+      return res
+    }
+    const redirectResponse = NextResponse.redirect(new URL('/dashboard', req.url))
+    res.cookies.getAll().forEach((c) => redirectResponse.cookies.set(c))
+    return redirectResponse
   }
 
   return res
