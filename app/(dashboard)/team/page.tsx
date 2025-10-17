@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Users, UserPlus, Mail, Phone, Calendar, Shield } from 'lucide-react'
+import Link from 'next/link'
 
 export default async function TeamPage() {
   const supabase = await createClient()
@@ -42,19 +43,19 @@ export default async function TeamPage() {
           </div>
           {canManageTeam && (
             <div className="flex items-center gap-3">
-              <a
+              <Link
                 href="/team/invitations"
                 className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
               >
                 View Invitations
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/team/invite"
                 className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-600"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 Invite Team Member
-              </a>
+              </Link>
             </div>
           )}
         </div>
@@ -250,13 +251,13 @@ export default async function TeamPage() {
           </p>
           {canManageTeam && (
             <div className="mt-6">
-              <a
+              <Link
                 href="/team/invite"
                 className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-600"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 Invite Your First Team Member
-              </a>
+              </Link>
             </div>
           )}
         </div>

@@ -17,7 +17,9 @@ export default function NewServicePage() {
     } else {
       router.replace('/services/new-guided')
     }
-  }, [router, searchParams])
+    // Run only once on mount; avoid re-exec due to searchParams object identity changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Show loading state while redirecting
   return (
