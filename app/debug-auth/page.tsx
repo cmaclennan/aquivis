@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 
 export default async function DebugAuthPage() {
   const cookieStore = await cookies()
+  const headersList = await headers()
   const supabase = await createClient()
-  
+
   const {
     data: { session },
     error: sessionError,
@@ -16,9 +17,15 @@ export default async function DebugAuthPage() {
   } = await supabase.auth.getUser()
 
   const allCookies = cookieStore.getAll()
-  const supabaseCookies = allCookies.filter(c => 
+  const supabaseCookies = allCookies.filter(c =>
     c.name.includes('supabase') || c.name.includes('sb-')
   )
+
+  // Get request info
+  const host = headersList.get('host')
+  const protocol = headersList.get('x-forwarded-proto') || 'http'
+  const userAgent = headersList.get('user-agent')
+  const referer = headersList.get('referer')
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -87,13 +94,26 @@ export default async function DebugAuthPage() {
           )}
         </div>
 
+        {/* Request Info */}
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h2 className="text-lg font-semibold mb-2">Request Info</h2>
+          <div className="text-sm space-y-1">
+            <p><span className="font-semibold">Host:</span> {host}</p>
+            <p><span className="font-semibold">Protocol:</span> {protocol}</p>
+            <p><span className="font-semibold">Full URL:</span> {protocol}://{host}/debug-auth</p>
+            <p><span className="font-semibold">Referer:</span> {referer || 'None'}</p>
+            <p><span className="font-semibold">User Agent:</span> {userAgent?.substring(0, 50)}...</p>
+          </div>
+        </div>
+
         {/* Environment */}
         <div className="bg-white p-4 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-2">Environment</h2>
           <div className="text-sm space-y-1">
-            <p><span className="font-semibold">Supabase URL:</span> {process.env.NEXT_PUBLIC_SUPABASE_URL}</p>
-            <p><span className="font-semibold">Anon Key:</span> {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 20)}...</p>
+            <p><span className="font-semibold">Supabase URL:</span> {process.env.NEXT_PUBLIC_SUPABASE_URL || '❌ NOT SET'}</p>
+            <p><span className="font-semibold">Anon Key:</span> {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? `${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 20)}...` : '❌ NOT SET'}</p>
             <p><span className="font-semibold">Node ENV:</span> {process.env.NODE_ENV}</p>
+            <p><span className="font-semibold">Vercel ENV:</span> {process.env.VERCEL_ENV || 'Not on Vercel'}</p>
           </div>
         </div>
 
