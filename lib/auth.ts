@@ -32,6 +32,17 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
+          // Validate environment variables
+          if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+            console.error('[auth] NEXT_PUBLIC_SUPABASE_URL is not set')
+            throw new Error('Configuration error: Missing Supabase URL')
+          }
+
+          if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            console.error('[auth] SUPABASE_SERVICE_ROLE_KEY is not set')
+            throw new Error('Configuration error: Missing service role key')
+          }
+
           const supabase = await createClient()
 
           // Query the profiles table directly to verify user exists
@@ -41,16 +52,21 @@ export const authOptions: NextAuthOptions = {
             .eq('email', credentials.email)
             .single()
 
-          if (profileError || !profile) {
+          if (profileError) {
+            console.error('[auth] Profile query error:', profileError)
+            throw new Error('Invalid credentials')
+          }
+
+          if (!profile) {
+            console.error('[auth] No profile found for email:', credentials.email)
             throw new Error('Invalid credentials')
           }
 
           // Use Supabase Admin API to verify password ONLY
-          // This is a temporary workaround - ideally we'd use a server-side RPC function
           const { createClient: createAdminClient } = await import('@supabase/supabase-js')
           const supabaseAdmin = createAdminClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY,
             {
               auth: {
                 autoRefreshToken: false,
@@ -65,9 +81,17 @@ export const authOptions: NextAuthOptions = {
             password: credentials.password,
           })
 
-          if (authError || !authData.user) {
+          if (authError) {
+            console.error('[auth] Password verification error:', authError.message)
             throw new Error('Invalid credentials')
           }
+
+          if (!authData.user) {
+            console.error('[auth] No user returned from password verification')
+            throw new Error('Invalid credentials')
+          }
+
+          console.log('[auth] Login successful for:', credentials.email)
 
           // Return user object for NextAuth JWT (NO Supabase session created)
           return {
@@ -77,6 +101,7 @@ export const authOptions: NextAuthOptions = {
             company_id: profile.company_id,
           }
         } catch (error) {
+          console.error('[auth] Authorization error:', error)
           throw new Error(error instanceof Error ? error.message : 'Authentication failed')
         }
       },
