@@ -23,8 +23,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  // Get NextAuth token
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+  // Get NextAuth token (unified secret resolution)
+  const SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
+  const token = await getToken({ req, secret: SECRET })
 
   // Public routes that don't require auth
   const publicRoutes = ['/login', '/signup', '/super-admin-login', '/customer-portal/login', '/']
