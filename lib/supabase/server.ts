@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { Database } from './types'
+import { logger } from '@/lib/logger'
 
 export async function createClient() {
   const cookieStore = await cookies()
@@ -17,7 +18,7 @@ export async function createClient() {
             c.name.includes('auth') || c.name.includes('sb-')
           )
           if (authCookies.length === 0) {
-            console.warn('[SUPABASE] No auth cookies found in server request')
+            logger.warn('[SUPABASE] No auth cookies found in server request')
           }
           return allCookies
         },
@@ -27,7 +28,7 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             })
           } catch (error) {
-            console.error('[SUPABASE] Error setting cookies:', error)
+            logger.error('[SUPABASE] Error setting cookies:', error)
           }
         },
       },

@@ -39,15 +39,15 @@ export default async function DashboardPage() {
 
   try {
     // Call the optimized dashboard function (single query, massive performance boost)
-    console.log('[DASHBOARD] Calling get_dashboard_summary RPC for user:', user.id)
+    logger.debug('[DASHBOARD] Calling get_dashboard_summary RPC for user:', user.id)
     const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_summary')
 
-    console.log('[DASHBOARD] RPC Response:', { rpcData, rpcError })
+    logger.debug('[DASHBOARD] RPC Response:', { rpcData, rpcError })
 
     if (rpcError) throw rpcError
 
     if (rpcData && !rpcData.error) {
-      console.log('[DASHBOARD] RPC Success - stats:', rpcData.stats)
+      logger.debug('[DASHBOARD] RPC Success - stats:', rpcData.stats)
       dashboardData = rpcData
       dashboardStats = {
         company_id: profile.company_id,
@@ -64,7 +64,7 @@ export default async function DashboardPage() {
       recentServices = rpcData.recent_services ?? []
     } else {
       // RPC function returned error, will use fallback
-      console.warn('[DASHBOARD] RPC function error:', rpcData?.error)
+      logger.warn('[DASHBOARD] RPC function error:', rpcData?.error)
       logger.debug('Dashboard RPC function not available, using fallback view')
     }
   } catch (error) {
