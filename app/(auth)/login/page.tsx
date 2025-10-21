@@ -23,11 +23,9 @@ function LoginInner() {
       const result = await loginAction(formData)
       if (result?.error) {
         setError(result.error)
-      } else if (result?.success && result?.redirectTo) {
-        // Client-side redirect after successful login
-        // This ensures cookies are properly set before navigation
-        router.push(result.redirectTo)
       }
+      // If successful, loginAction will handle server-side redirect
+      // No need to handle redirect here
     })
   }
 

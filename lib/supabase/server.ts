@@ -11,7 +11,15 @@ export async function createClient() {
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll()
+          const allCookies = cookieStore.getAll()
+          // Log auth cookies for debugging
+          const authCookies = allCookies.filter(c =>
+            c.name.includes('auth') || c.name.includes('sb-')
+          )
+          if (authCookies.length === 0) {
+            console.warn('[SUPABASE] No auth cookies found in server request')
+          }
+          return allCookies
         },
         setAll(cookiesToSet) {
           try {
@@ -19,7 +27,7 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             })
           } catch (error) {
-            // Silently fail - server component
+            console.error('[SUPABASE] Error setting cookies:', error)
           }
         },
       },
