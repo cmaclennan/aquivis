@@ -8,13 +8,13 @@ import { logger } from '@/lib/logger'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  
+
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (!user) {
     redirect('/login')
   }
-  
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
@@ -39,11 +39,15 @@ export default async function DashboardPage() {
 
   try {
     // Call the optimized dashboard function (single query, massive performance boost)
+    logger.debug('[DASHBOARD] Calling get_dashboard_summary RPC for user:', user.id)
     const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_summary')
+
+    logger.debug('[DASHBOARD] RPC Response:', { rpcData, rpcError })
 
     if (rpcError) throw rpcError
 
     if (rpcData && !rpcData.error) {
+      logger.debug('[DASHBOARD] RPC Success - stats:', rpcData.stats)
       dashboardData = rpcData
       dashboardStats = {
         company_id: profile.company_id,
@@ -60,6 +64,7 @@ export default async function DashboardPage() {
       recentServices = rpcData.recent_services ?? []
     } else {
       // RPC function returned error, will use fallback
+      logger.warn('[DASHBOARD] RPC function error:', rpcData?.error)
       logger.debug('Dashboard RPC function not available, using fallback view')
     }
   } catch (error) {
