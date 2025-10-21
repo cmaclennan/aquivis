@@ -1,4 +1,4 @@
-import { type NextAuthOptions } from 'next-auth'
+import NextAuth, { type NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { createClient } from '@/lib/supabase/server'
 
@@ -83,4 +83,6 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
 }
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
 

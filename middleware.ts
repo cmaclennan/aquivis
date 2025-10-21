@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getToken } from 'next-auth/jwt'
 
 /**
- * Simplified Middleware
+ * NextAuth.js Middleware
  *
- * This middleware now only handles basic routing and does NOT check authentication.
- * Authentication is now handled by the (protected) layout component which runs
- * in Node.js runtime with full cookie support.
- *
- * Why this change?
- * - Edge Runtime (where middleware runs) has limitations with cookie handling
- * - Node.js Runtime (where layouts run) has full cookie support
- * - This separation of concerns is cleaner and more reliable
+ * This middleware checks NextAuth JWT tokens and handles role-based redirects.
+ * - Protects routes that require authentication
+ * - Redirects to appropriate login page based on route
+ * - Redirects authenticated users away from login pages
  */
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -26,7 +23,37 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  // Just pass through - let layouts handle auth
+  // Get NextAuth token
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+
+  // Public routes that don't require auth
+  const publicRoutes = ['/login', '/signup', '/super-admin-login', '/customer-portal/login', '/']
+
+  // Check if route is public
+  const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
+
+  // If no token and trying to access protected route, redirect to login
+  if (!token && !isPublicRoute) {
+    // Determine which login page to redirect to
+    if (pathname.startsWith('/super-admin')) {
+      return NextResponse.redirect(new URL('/super-admin-login', req.url))
+    } else if (pathname.startsWith('/customer-portal')) {
+      return NextResponse.redirect(new URL('/customer-portal/login', req.url))
+    } else if (pathname.startsWith('/dashboard') || pathname.startsWith('/properties') || pathname.startsWith('/services') || pathname.startsWith('/customers') || pathname.startsWith('/jobs') || pathname.startsWith('/schedule') || pathname.startsWith('/reports') || pathname.startsWith('/settings') || pathname.startsWith('/team') || pathname.startsWith('/profile') || pathname.startsWith('/equipment') || pathname.startsWith('/management') || pathname.startsWith('/monitoring')) {
+      return NextResponse.redirect(new URL('/login', req.url))
+    }
+  }
+
+  // If token exists and trying to access login pages, redirect to dashboard
+  if (token && (pathname === '/login' || pathname === '/super-admin-login' || pathname === '/customer-portal/login')) {
+    // Redirect based on role
+    if (token.role === 'super_admin') {
+      return NextResponse.redirect(new URL('/super-admin', req.url))
+    } else {
+      return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+  }
+
   return NextResponse.next({
     request: {
       headers: req.headers,

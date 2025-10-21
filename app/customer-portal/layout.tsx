@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { SessionTimeoutWrapper } from '@/components/auth/SessionTimeoutWrapper'
@@ -8,24 +8,10 @@ export default async function CustomerPortalLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
+  // Check NextAuth session
+  const session = await auth()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/customer-portal/login')
-  }
-
-  // Verify user has customer access
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, email')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile) {
+  if (!session?.user) {
     redirect('/customer-portal/login')
   }
 

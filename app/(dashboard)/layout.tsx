@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import Image from 'next/image'
 import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut, Droplets, Settings, BarChart3, Calendar } from 'lucide-react'
@@ -10,20 +11,24 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  
-  // Check authentication
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+  // Check NextAuth session
+  const session = await auth()
+
+  if (!session?.user) {
     redirect('/login')
   }
 
-  // Get user profile and company
+  // Verify user has company_id (not super admin)
+  if (!session.user.company_id) {
+    redirect('/onboarding')
+  }
+
+  // Get user profile and company for display
+  const supabase = await createClient()
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
-    .eq('id', user.id)
+    .eq('id', session.user.id)
     .single()
 
   if (!profile?.company_id) {
