@@ -134,12 +134,18 @@ if (!/monitoring/.test(middleware)) {
 }
 ok('middleware excludes /monitoring')
 
-// 6) No console.* in app/, components/, lib/
+// 6) No console.* in app/, components/, lib/ (except logger.ts)
 const scanDirs = ['app', 'components', 'lib']
 const consoleMatches = []
+const allowedConsoleFiles = new Set([
+  path.normalize('lib/logger.ts'),
+  path.normalize('lib\\logger.ts'),
+])
 for (const dir of scanDirs) {
   const files = walkFiles([dir])
   for (const file of files) {
+    const normalizedFile = path.normalize(file)
+    if (allowedConsoleFiles.has(normalizedFile)) continue
     const content = fs.readFileSync(file, 'utf-8')
     if (content.includes('console.')) {
       consoleMatches.push(file)
@@ -149,7 +155,7 @@ for (const dir of scanDirs) {
 if (consoleMatches.length) {
   fail(`console.* statements found in:\n- ${Array.from(new Set(consoleMatches)).slice(0, 20).join('\n- ')}${consoleMatches.length > 20 ? '\n…' : ''}`)
 }
-ok('No console statements in app/, components/, lib/')
+ok('No console statements in app/, components/, lib/ (except logger.ts)')
 
 ok('All automated pre-push checks passed')
 
