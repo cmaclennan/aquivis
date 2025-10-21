@@ -66,20 +66,6 @@ export default async function DashboardPage() {
       // RPC function returned error, will use fallback
       logger.warn('[DASHBOARD] RPC function error:', rpcData?.error)
       logger.debug('Dashboard RPC function not available, using fallback view')
-      // Store error in a way that can be displayed to user
-      dashboardStats = {
-        company_id: profile.company_id,
-        company_name: profile.companies?.name || 'Company',
-        property_count: 0,
-        unit_count: 0,
-        today_services: 0,
-        week_services: 0,
-        total_services: 0,
-        water_quality_issues: 0,
-        today_bookings: 0,
-        recent_services: 0,
-        _debug_error: rpcData?.error || 'Unknown error'
-      }
     }
   } catch (error) {
     // Fallback to optimized view if RPC function fails
@@ -167,14 +153,6 @@ export default async function DashboardPage() {
       <PageLoadTracker page="dashboard" />
     <div className="p-8">
       <div className="space-y-6">
-
-      {/* Debug Info - Remove in production */}
-      {dashboardStats?._debug_error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm font-medium text-red-800">⚠️ Debug: RPC Error</p>
-          <p className="text-xs text-red-700 mt-1">{dashboardStats._debug_error}</p>
-        </div>
-      )}
 
       {/* Dashboard Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
