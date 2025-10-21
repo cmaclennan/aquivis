@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut, Droplets, Settings, BarChart3, Calendar } from 'lucide-react'
 import { SessionTimeoutHandler } from '@/components/auth/SessionTimeoutHandler'
+import { logger } from '@/lib/logger'
 
 export default async function DashboardLayout({
   children,
@@ -16,7 +17,7 @@ export default async function DashboardLayout({
   // Check NextAuth session
   const session = await auth()
 
-  console.log('[Dashboard Layout] Session check:', {
+  logger.info('[Dashboard Layout] Session check', {
     hasSession: !!session,
     hasUser: !!session?.user,
     userId: session?.user?.id,
@@ -25,7 +26,7 @@ export default async function DashboardLayout({
   })
 
   if (!session?.user) {
-    console.log('[Dashboard Layout] No session/user, redirecting to /login')
+    logger.warn('[Dashboard Layout] No session/user, redirecting to /login')
     redirect('/login')
   }
 
