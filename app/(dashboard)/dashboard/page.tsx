@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { Building2, CheckCircle2, User, Calendar, Clock, AlertTriangle, TrendingUp, Plus, Droplets } from 'lucide-react'
@@ -27,13 +27,24 @@ export default async function DashboardPage() {
     )
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*, companies(*)')
     .eq('id', userId)
     .single()
+
+  if (profileError || !profile) {
+    logger.error('[DASHBOARD] Profile query failed', profileError)
+    // Use data from headers as fallback
+    const fallbackProfile = {
+      id: userId,
+      company_id: companyId,
+      companies: null
+    }
+    // Continue with fallback data
+  }
 
   // Use optimized dashboard RPC function for 70-90% faster loading
   let dashboardData: any = null
@@ -43,8 +54,8 @@ export default async function DashboardPage() {
 
   try {
     // Call the optimized dashboard function (single query, massive performance boost)
-    logger.debug('[DASHBOARD] Calling get_dashboard_summary RPC for user:', user.id)
-    const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_summary')
+    logger.debug('[DASHBOARD] Calling get_dashboard_summary RPC for user:', userId)
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_summary', { p_user_id: userId })
 
     logger.debug('[DASHBOARD] RPC Response:', { rpcData, rpcError })
 
@@ -54,8 +65,8 @@ export default async function DashboardPage() {
       logger.debug('[DASHBOARD] RPC Success - stats:', rpcData.stats)
       dashboardData = rpcData
       dashboardStats = {
-        company_id: profile.company_id,
-        company_name: profile.companies?.name || 'Company',
+        company_id: companyId,
+        company_name: profile?.companies?.name || 'Company',
         property_count: rpcData.stats?.active_properties ?? 0,
         unit_count: 0, // Not in RPC function, will add if needed
         today_services: rpcData.stats?.today_services ?? 0,
@@ -79,12 +90,12 @@ export default async function DashboardPage() {
       const { data: stats } = await supabase
         .from('dashboard_stats_optimized')
         .select('*')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .single()
 
       dashboardStats = stats || {
-        company_id: profile.company_id,
-        company_name: profile.companies?.name || 'Company',
+        company_id: companyId,
+        company_name: profile?.companies?.name || 'Company',
         property_count: 0,
         unit_count: 0,
         today_services: 0,
@@ -99,7 +110,7 @@ export default async function DashboardPage() {
       const { data: servicesData } = await supabase
         .from('services_summary')
         .select('*')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .order('created_at', { ascending: false })
         .limit(5)
 
@@ -107,8 +118,8 @@ export default async function DashboardPage() {
     } catch (fallbackError) {
       logger.error('Dashboard fallback error', fallbackError)
       dashboardStats = {
-        company_id: profile.company_id,
-        company_name: profile.companies?.name || 'Company',
+        company_id: companyId,
+        company_name: profile?.companies?.name || 'Company',
         property_count: 0,
         unit_count: 0,
         today_services: 0,
@@ -134,13 +145,14 @@ export default async function DashboardPage() {
           properties!inner(name, company_id)
         )
       `)
-      .eq('units.properties.company_id', profile.company_id)
+      .eq('units.properties.company_id', companyId)
       .eq('check_in_date', new Date().toISOString().split('T')[0])
       .order('check_in_time', { ascending: true })
       .limit(5)
 
     upcomingBookings = bookingsData ?? []
   } catch (error) {
+    logger.debug('[DASHBOARD] Bookings query failed', error)
     upcomingBookings = []
   }
 

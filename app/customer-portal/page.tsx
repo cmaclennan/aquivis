@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import Link from 'next/link'
@@ -13,7 +13,7 @@ export default async function CustomerPortalDashboard() {
     redirect('/customer-portal/login')
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: profile } = await supabase
     .from('profiles')

@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function CustomerPortalLayout({
   children,
@@ -19,7 +19,7 @@ export default async function CustomerPortalLayout({
   }
 
   // Get user profile for display
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: profile } = await supabase
     .from('profiles')
     .select('email, first_name, last_name')

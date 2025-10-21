@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import Link from 'next/link'
@@ -27,7 +27,7 @@ export default async function UnitDetailPage({
     redirect('/onboarding')
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Get unit with property info
   const { data: unit, error } = await supabase

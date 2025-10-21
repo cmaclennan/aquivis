@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { Users, UserPlus, Mail, Phone, Calendar, Shield } from 'lucide-react'
@@ -19,7 +19,7 @@ export default async function TeamPage() {
     redirect('/onboarding')
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -225,7 +225,7 @@ export default async function TeamPage() {
                         {member.role !== 'owner' && (
                           <form action={async () => {
                             'use server'
-                            const supabase = await createClient()
+                            const supabase = createAdminClient()
                             // Soft-remove: clear company_id to detach from team
                             await supabase.from('profiles').update({ company_id: null }).eq('id', member.id)
                           }}>

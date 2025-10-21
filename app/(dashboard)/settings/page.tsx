@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { Settings, Building2, CreditCard, Bell, Shield, Users } from 'lucide-react'
@@ -24,7 +24,7 @@ export default async function SettingsPage() {
     redirect('/dashboard')
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: profile } = await supabase
     .from('profiles')

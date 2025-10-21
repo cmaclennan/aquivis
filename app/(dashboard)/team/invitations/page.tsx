@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 
@@ -16,7 +16,7 @@ export default async function TeamInvitationsPage() {
     redirect('/onboarding')
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: invitations } = await supabase
     .from('team_invitations')

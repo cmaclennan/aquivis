@@ -1,6 +1,6 @@
 import NextAuth, { type NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 // Validate required environment variables
 const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
@@ -41,22 +41,9 @@ export const authOptions: NextAuthOptions = {
             throw new Error('Configuration: Missing service role key')
           }
 
-          const supabase = await createClient()
-
-          // Query the profiles table directly to verify user exists
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('id, email, role, company_id')
-            .eq('email', credentials.email)
-            .single()
-
-          if (profileError || !profile) {
-            throw new Error('Invalid credentials')
-          }
-
-          // Use Supabase Admin API to verify password ONLY
-          const { createClient: createAdminClient } = await import('@supabase/supabase-js')
-          const supabaseAdmin = createAdminClient(
+          // Use Supabase Admin client for BOTH profile query AND password verification
+          // This avoids the cookie-based server client which can cause issues
+          const supabaseAdmin = createSupabaseClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL,
             process.env.SUPABASE_SERVICE_ROLE_KEY,
             {
@@ -66,6 +53,17 @@ export const authOptions: NextAuthOptions = {
               }
             }
           )
+
+          // Query the profiles table directly to verify user exists
+          const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, email, role, company_id')
+            .eq('email', credentials.email)
+            .single()
+
+          if (profileError || !profile) {
+            throw new Error('Invalid credentials')
+          }
 
           // Verify password using admin client
           const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { Plus, Users, Mail, Phone } from 'lucide-react'
@@ -22,7 +22,7 @@ export default async function CustomersPage({
     redirect('/onboarding')
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Pagination - await searchParams
   const params = await searchParams

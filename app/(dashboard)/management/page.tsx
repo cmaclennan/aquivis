@@ -49,7 +49,7 @@ export default function ManagementDashboardPage() {
       let servicesQuery = supabase
         .from('services')
         .select('id, service_date, status, technician_id, units!inner(properties!inner(company_id, id))', { count: 'exact' })
-        .eq('units.properties.company_id', profile.company_id)
+        .eq('units.properties.company_id', session.user.company_id)
         .gte('service_date', startIso)
         .lte('service_date', endIso)
       if (filters.property) servicesQuery = servicesQuery.eq('units.properties.id', filters.property)
@@ -63,7 +63,7 @@ export default function ManagementDashboardPage() {
       let testsQuery = supabase
         .from('water_tests')
         .select('id, services!inner(service_date, units!inner(properties!inner(company_id, id)))')
-        .eq('services.units.properties.company_id', profile.company_id)
+        .eq('services.units.properties.company_id', session.user.company_id)
         .gte('services.service_date', startIso)
         .lte('services.service_date', endIso)
       if (filters.property) testsQuery = testsQuery.eq('services.units.properties.id', filters.property)
@@ -76,7 +76,7 @@ export default function ManagementDashboardPage() {
       let activityQuery = supabase
         .from('services')
         .select('id, service_date, service_type, status, units(name, properties(name)), technician_id')
-        .eq('units.properties.company_id', profile.company_id)
+        .eq('units.properties.company_id', session.user.company_id)
         .gte('service_date', startIso)
         .lte('service_date', endIso)
         .order('service_date', { ascending: false })

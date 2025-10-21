@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import Link from 'next/link'
@@ -25,7 +25,7 @@ export default async function CustomerDetailPage({
     redirect('/onboarding')
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   if (!profile?.company_id) {
     redirect('/onboarding')

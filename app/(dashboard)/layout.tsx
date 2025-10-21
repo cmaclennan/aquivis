@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import Image from 'next/image'
 import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut, Droplets, Settings, BarChart3, Calendar } from 'lucide-react'
@@ -29,7 +29,7 @@ export default async function DashboardLayout({
   }
 
   // Get user profile and company for display
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
@@ -121,7 +121,7 @@ export default async function DashboardLayout({
             <BarChart3 className="h-5 w-5" />
             <span>Reports</span>
           </Link>
-          {(profile.role === 'owner' || profile.role === 'super_admin') && (
+          {(profile?.role === 'owner' || profile?.role === 'super_admin') && (
             <Link
               href="/settings"
               className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
@@ -141,9 +141,9 @@ export default async function DashboardLayout({
                 className="min-w-0 flex-1 hover:bg-primary-100 rounded p-1 -m-1 transition-colors"
               >
                 <p className="font-medium text-primary-700 text-sm truncate">
-                  {profile.first_name} {profile.last_name}
+                  {profile?.first_name} {profile?.last_name}
                 </p>
-                <p className="text-xs text-primary-600 capitalize truncate">{profile.role}</p>
+                <p className="text-xs text-primary-600 capitalize truncate">{profile?.role}</p>
               </Link>
               <Link
                 href="/logout"

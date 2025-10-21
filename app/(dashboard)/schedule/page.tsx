@@ -73,7 +73,7 @@ export default function SchedulePage({}: Props) {
       const { data: techs } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, role, company_id')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', session.user.company_id)
       setTechnicians(
         (techs || [])
           .filter((p: any) => ['technician', 'tech', 'staff'].includes((p.role || '').toLowerCase()))

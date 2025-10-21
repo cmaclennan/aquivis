@@ -85,7 +85,7 @@ export default function ReportsClient() {
             properties!inner(name, company_id)
           )
         `)
-        .eq('units.properties.company_id', profile.company_id)
+        .eq('units.properties.company_id', session.user.company_id)
 
       // Apply date filter
       if (filters.dateRange === 'custom') {
@@ -122,7 +122,7 @@ export default function ReportsClient() {
       let chemQuery = supabase
         .from('chemical_additions')
         .select(`chemical_type, unit_of_measure, quantity, services!inner(service_date, units!inner(properties!inner(company_id)))`)
-        .eq('services.units.properties.company_id', profile.company_id)
+        .eq('services.units.properties.company_id', session.user.company_id)
 
       if (filters.dateRange === 'custom') {
         chemQuery = chemQuery
