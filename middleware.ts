@@ -2,9 +2,6 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Force Node.js runtime to avoid Edge Runtime issues with Supabase
-export const runtime = 'nodejs'
-
 export async function middleware(req: NextRequest) {
   // Enforce canonical host early to prevent auth cookie host mismatches
   const url = req.nextUrl.clone()
