@@ -2,6 +2,7 @@
 
 import { use } from 'react'
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -30,6 +31,7 @@ interface Failure {
 
 export default function FailureDetailPage({ params }: { params: Promise<{ equipmentId: string; failureId: string }> }) {
   const { equipmentId, failureId } = use(params)
+  const { data: session } = useSession()
   const supabase = createClient()
   const router = useRouter()
 
@@ -63,18 +65,18 @@ export default function FailureDetailPage({ params }: { params: Promise<{ equipm
   }, [failureId, supabase])
 
   const handleResolve = async () => {
+    if (!session?.user?.id) return
+
     try {
       setSaving(true)
       setError(null)
-
-      const { data: { user } } = await supabase.auth.getUser()
 
       const { error: updateError } = await supabase
         .from('equipment_failures')
         .update({
           resolved: true,
           resolved_date: new Date().toISOString(),
-          resolved_by: user?.id,
+          resolved_by: session.user.id,
           resolution_notes: resolutionNotes.trim() || null,
           parts_cost: partsCost ? parseFloat(partsCost) : 0,
           labor_cost: laborCost ? parseFloat(laborCost) : 0

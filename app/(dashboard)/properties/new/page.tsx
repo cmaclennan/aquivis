@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Building2, MapPin, Phone, Mail, User } from 'lucide-react'
@@ -10,8 +11,9 @@ type PropertyType = 'residential' | 'commercial' | 'resort' | 'body_corporate'
 
 export default function NewPropertyPage() {
   const router = useRouter()
+  const { data: session } = useSession()
   const supabase = createClient()
-  
+
   // Form state
   const [name, setName] = useState('')
   const [propertyType, setPropertyType] = useState<PropertyType>('residential')
@@ -31,23 +33,15 @@ export default function NewPropertyPage() {
     setError(null)
 
     try {
-      // Get current user and company
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
+      if (!session?.user?.company_id) {
+        throw new Error('Not authenticated or no company found')
+      }
 
       // Create property
       const { data: property, error: propertyError } = await supabase
         .from('properties')
         .insert({
-          company_id: profile.company_id,
+          company_id: session.user.company_id,
           name: name.trim(),
           property_type: propertyType,
           has_individual_units: hasIndividualUnits,

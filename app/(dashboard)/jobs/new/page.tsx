@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function NewJobPage() {
+  const { data: session } = useSession()
   const supabase = createClient()
   const router = useRouter()
   const [title, setTitle] = useState('')
@@ -21,24 +23,20 @@ export default function NewJobPage() {
 
   // Load company customers
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
-      if (!profile?.company_id) return
-      const { data } = await supabase.from('customers').select('id, name').eq('company_id', profile.company_id).order('name')
+      const { data } = await supabase.from('customers').select('id, name').eq('company_id', session.user.company_id).order('name')
       setCustomers(data || [])
     })()
-  }, [supabase])
+  }, [supabase, session])
 
   const save = async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setSaving(true)
       setError(null)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Determine customer linkage / external contact
       let customerId: string | null = null
@@ -48,11 +46,11 @@ export default function NewJobPage() {
         if (!newCustomer.name.trim()) throw new Error('Customer name is required')
         const { data: c, error: cErr } = await supabase
           .from('customers')
-          .insert({ 
-            company_id: profile.company_id, 
-            name: newCustomer.name.trim(), 
-            email: newCustomer.email || null, 
-            phone: newCustomer.phone || null, 
+          .insert({
+            company_id: session.user.company_id,
+            name: newCustomer.name.trim(),
+            email: newCustomer.email || null,
+            phone: newCustomer.phone || null,
             address: newCustomer.address || null,
             customer_type: 'property_owner' // Add required field
           })
@@ -67,7 +65,7 @@ export default function NewJobPage() {
       }
 
       const { data, error } = await supabase.from('jobs').insert({
-        company_id: profile.company_id,
+        company_id: session.user.company_id,
         title: title.trim(),
         job_type: jobType,
         status,

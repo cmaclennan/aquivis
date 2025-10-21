@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import ScheduleBuilder from '@/components/scheduling/ScheduleBuilder'
@@ -18,6 +19,7 @@ type TemplateRow = {
 }
 
 export default function TemplatesPage() {
+  const { data: session } = useSession()
   const supabase = useMemo(() => createClient(), [])
   const [companyId, setCompanyId] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -33,22 +35,16 @@ export default function TemplatesPage() {
   const [renameValue, setRenameValue] = useState<string>('')
 
   const load = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-      if (!profile?.company_id) throw new Error('No company found')
-      setCompanyId(profile.company_id)
+      setCompanyId(session.user.company_id)
 
       const { data, error: err } = await supabase
         .from('schedule_templates')
         .select('id, template_name, template_type, template_config, is_active, created_at, applicable_unit_types, applicable_water_types, description')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', session.user.company_id)
         .order('template_name')
       if (err) throw err
       setTemplates((data || []) as any)
@@ -57,11 +53,12 @@ export default function TemplatesPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, session])
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
     load()
-  }, [load])
+  }, [load, session])
 
   const saveNewTemplate = async (schedule: any) => {
     try {

@@ -1,35 +1,40 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { Users, UserPlus, Mail, Phone, Calendar, Shield } from 'lucide-react'
 import Link from 'next/link'
 
 export default async function TeamPage() {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userRole = headersList.get('x-user-role')
+  const companyId = headersList.get('x-user-company-id')
+
+  if (!userId) {
     redirect('/login')
   }
-  
+
+  if (!companyId) {
+    redirect('/onboarding')
+  }
+
+  const supabase = await createClient()
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single()
-
-  if (!profile?.company_id) {
-    redirect('/onboarding')
-  }
 
   // Get all team members for this company
   const { data: teamMembers } = await supabase
     .from('profiles')
     .select('*')
-    .eq('company_id', profile.company_id)
+    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
 
-  const canManageTeam = profile?.role === 'owner' || profile?.role === 'manager'
+  const canManageTeam = userRole === 'owner' || userRole === 'manager'
 
   return (
     <div className="p-8">

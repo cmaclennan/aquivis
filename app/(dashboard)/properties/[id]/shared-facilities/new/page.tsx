@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge, Building2 } from 'lucide-react'
@@ -16,6 +17,7 @@ export default function NewSharedFacilityPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  const { data: session } = useSession()
   const router = useRouter()
   const supabase = createClient()
   const [propertyId, setPropertyId] = useState<string>('')
@@ -39,23 +41,14 @@ export default function NewSharedFacilityPage({
   const [property, setProperty] = useState<any>(null)
 
   const loadProperty = useCallback(async (resolvedPropertyId: string) => {
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
-
       const { data: propertyData, error: propertyError } = await supabase
         .from('properties')
         .select('id, name, property_type')
         .eq('id', resolvedPropertyId)
-        .eq('company_id', profile.company_id)
+        .eq('company_id', session.user.company_id)
         .single()
 
       if (propertyError) throw propertyError
@@ -63,7 +56,7 @@ export default function NewSharedFacilityPage({
     } catch (err: any) {
       setError(err.message)
     }
-  }, [supabase])
+  }, [supabase, session])
 
   useEffect(() => {
     // Resolve params Promise
@@ -75,20 +68,12 @@ export default function NewSharedFacilityPage({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!session?.user?.company_id) return
+
     setLoading(true)
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Create shared facility
       const { data: unit, error: unitError } = await supabase

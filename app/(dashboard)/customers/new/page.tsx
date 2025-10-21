@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Mail, Phone, MapPin, CreditCard } from 'lucide-react'
@@ -11,8 +12,9 @@ import { customerSchema, type CustomerFormData } from '@/lib/validations/schemas
 
 export default function NewCustomerPage() {
   const router = useRouter()
+  const { data: session } = useSession()
   const supabase = createClient()
-  
+
   // Form with validation
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -39,23 +41,15 @@ export default function NewCustomerPage() {
     setError(null)
 
     try {
-      // Get current user and company
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
+      if (!session?.user?.company_id) {
+        throw new Error('Not authenticated or no company found')
+      }
 
       // Data is already validated by Zod resolver
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .insert({
-          company_id: profile.company_id,
+          company_id: session.user.company_id,
           name: data.name.trim(),
           customer_type: data.customer_type,
           email: data.email?.trim() || null,

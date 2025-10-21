@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -8,6 +9,7 @@ import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft } from 'lucide-react'
 
 export default function EditProfilePage() {
+  const { data: session } = useSession()
   const supabase = createClient()
   const router = useRouter()
   const { toast } = useToast()
@@ -20,17 +22,14 @@ export default function EditProfilePage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!session?.user?.id) return
+
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          setError('Not authenticated')
-          return
-        }
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('first_name, last_name, phone')
-          .eq('id', user.id)
+          .eq('id', session.user.id)
           .single()
         if (profileError) throw profileError
         setFirstName(profile?.first_name || '')
@@ -42,15 +41,15 @@ export default function EditProfilePage() {
         setLoading(false)
       }
     })()
-  }, [supabase])
+  }, [supabase, session])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!session?.user?.id) return
+
     setSaving(true)
     setError(null)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
@@ -58,7 +57,7 @@ export default function EditProfilePage() {
           last_name: lastName.trim() || null,
           phone: phone.trim() || null,
         })
-        .eq('id', user.id)
+        .eq('id', session.user.id)
       if (updateError) throw updateError
       toast({ title: 'Profile updated', description: 'Your profile has been saved.' })
       router.push('/profile')

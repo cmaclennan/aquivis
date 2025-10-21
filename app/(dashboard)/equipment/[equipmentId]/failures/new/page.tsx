@@ -2,6 +2,7 @@
 
 import { use } from 'react'
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -10,6 +11,7 @@ import { logger } from '@/lib/logger'
 
 export default function ReportFailurePage({ params }: { params: Promise<{ equipmentId: string }> }) {
   const { equipmentId } = use(params)
+  const { data: session } = useSession()
   const supabase = createClient()
   const router = useRouter()
 
@@ -47,11 +49,11 @@ export default function ReportFailurePage({ params }: { params: Promise<{ equipm
       return
     }
 
+    if (!session?.user?.id) return
+
     try {
       setSaving(true)
       setError(null)
-
-      const { data: { user } } = await supabase.auth.getUser()
 
       const { error: insertError } = await supabase
         .from('equipment_failures')
@@ -61,7 +63,7 @@ export default function ReportFailurePage({ params }: { params: Promise<{ equipm
           severity,
           description: description.trim(),
           downtime_hours: downtimeHours ? parseFloat(downtimeHours) : null,
-          reported_by: user?.id,
+          reported_by: session.user.id,
           resolved: false
         })
 

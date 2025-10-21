@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge, Calendar as CalIcon } from 'lucide-react'
@@ -17,10 +18,11 @@ export default function NewUnitPage({
 }) {
   // Unwrap params Promise for Next.js 15
   const { id: propertyId } = use(params)
-  
+
   const router = useRouter()
+  const { data: session } = useSession()
   const supabase = createClient()
-  
+
   const [propertyName, setPropertyName] = useState('')
   const [customers, setCustomers] = useState<Array<{id: string, name: string, customer_type: string}>>([])
   
@@ -41,6 +43,8 @@ const [unitType, setUnitType] = useState<UnitType>('residential_pool')
 
   // Load property name and customers
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     async function loadData() {
       // Load property name
       const { data: property } = await supabase
@@ -48,36 +52,25 @@ const [unitType, setUnitType] = useState<UnitType>('residential_pool')
         .select('name')
         .eq('id', propertyId)
         .single()
-      
+
       if (property) {
         setPropertyName(property.name)
       }
 
       // Load company customers for dropdown
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
+      const { data: customersData } = await supabase
+        .from('customers')
+        .select('id, name, customer_type')
+        .eq('company_id', session.user.company_id)
+        .eq('is_active', true)
+        .order('name')
 
-        if (profile) {
-          const { data: customersData } = await supabase
-            .from('customers')
-            .select('id, name, customer_type')
-            .eq('company_id', profile.company_id)
-            .eq('is_active', true)
-            .order('name')
-
-          if (customersData) {
-            setCustomers(customersData)
-          }
-        }
+      if (customersData) {
+        setCustomers(customersData)
       }
     }
     loadData()
-  }, [propertyId, supabase])
+  }, [propertyId, supabase, session])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,24 +78,15 @@ const [unitType, setUnitType] = useState<UnitType>('residential_pool')
     setError(null)
 
     try {
-      // Get current user and company
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
-
+      if (!session?.user?.company_id) {
+        throw new Error('Not authenticated or no company found')
+      }
       // Verify property belongs to company
       const { data: property } = await supabase
         .from('properties')
         .select('id, total_volume_litres')
         .eq('id', propertyId)
-        .eq('company_id', profile.company_id)
+        .eq('company_id', session.user.company_id)
         .single()
 
       if (!property) throw new Error('Property not found')
