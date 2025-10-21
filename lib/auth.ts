@@ -2,6 +2,18 @@ import NextAuth, { type NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { createClient } from '@/lib/supabase/server'
 
+// Validate required environment variables
+const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET
+const NEXTAUTH_URL = process.env.NEXTAUTH_URL
+
+if (!NEXTAUTH_SECRET) {
+  throw new Error('NEXTAUTH_SECRET environment variable is not set')
+}
+
+if (!NEXTAUTH_URL) {
+  throw new Error('NEXTAUTH_URL environment variable is not set')
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -80,9 +92,9 @@ export const authOptions: NextAuthOptions = {
   },
   jwt: {
     maxAge: 60 * 60 * 24, // 24 hours
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: NEXTAUTH_SECRET,
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: NEXTAUTH_SECRET,
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
