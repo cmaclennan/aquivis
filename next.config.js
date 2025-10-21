@@ -101,6 +101,8 @@ const sentryWebpackPluginOptions = {
   disableLogger: true,
   // Enables automatic instrumentation of Vercel Cron Monitors
   automaticVercelMonitors: true,
+  // Disable source maps upload if auth token or project not configured
+  disableSourceMapUpload: !process.env.SENTRY_AUTH_TOKEN || !process.env.SENTRY_ORG || !process.env.SENTRY_PROJECT,
 }
 
 module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions)
