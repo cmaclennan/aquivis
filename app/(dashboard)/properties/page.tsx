@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { Plus, Building2, MapPin } from 'lucide-react'
 import Link from 'next/link'
 
@@ -8,24 +9,20 @@ export default async function PropertiesPage({
 }: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const supabase = await createClient()
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const companyId = headersList.get('x-user-company-id')
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!userId) {
     redirect('/login')
   }
 
-  // Get user's company
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('company_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.company_id) {
+  if (!companyId) {
     redirect('/onboarding')
   }
+
+  const supabase = await createClient()
 
   // Pagination - await searchParams
   const params = await searchParams
@@ -39,7 +36,7 @@ export default async function PropertiesPage({
   const { data: properties = [] } = await supabase
     .from('properties_optimized')
     .select('id, name, property_type, address, company_id, unit_count, service_count')
-    .eq('company_id', profile.company_id)
+    .eq('company_id', companyId)
     .order('name')
     .range(from, to)
 

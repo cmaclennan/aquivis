@@ -34,31 +34,45 @@ export const authOptions: NextAuthOptions = {
         try {
           const supabase = await createClient()
 
-          // Sign in with Supabase
-          const { data, error } = await supabase.auth.signInWithPassword({
+          // Query the profiles table directly to verify user exists
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, email, role, company_id')
+            .eq('email', credentials.email)
+            .single()
+
+          if (profileError || !profile) {
+            throw new Error('Invalid credentials')
+          }
+
+          // Use Supabase Admin API to verify password ONLY
+          // This is a temporary workaround - ideally we'd use a server-side RPC function
+          const { createClient: createAdminClient } = await import('@supabase/supabase-js')
+          const supabaseAdmin = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+              auth: {
+                autoRefreshToken: false,
+                persistSession: false
+              }
+            }
+          )
+
+          // Verify password using admin client
+          const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
             email: credentials.email,
             password: credentials.password,
           })
 
-          if (error || !data.user) {
-            throw new Error(error?.message || 'Invalid credentials')
+          if (authError || !authData.user) {
+            throw new Error('Invalid credentials')
           }
 
-          // Get user profile with role
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('id, email, role, company_id')
-            .eq('id', data.user.id)
-            .single()
-
-          if (profileError || !profile) {
-            throw new Error('User profile not found')
-          }
-
-          // Return user object with role and company_id
+          // Return user object for NextAuth JWT (NO Supabase session created)
           return {
-            id: data.user.id,
-            email: data.user.email,
+            id: profile.id,
+            email: profile.email,
             role: profile.role || 'user',
             company_id: profile.company_id,
           }

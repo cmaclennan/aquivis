@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Building2, MapPin, Phone, Mail, User, Trash2 } from 'lucide-react'
@@ -17,8 +18,9 @@ export default function EditPropertyPage({
   const { id: propertyId } = use(params)
   
   const router = useRouter()
+  const { data: session } = useSession()
   const supabase = createClient()
-  
+
   // Form state
   const [name, setName] = useState('')
   const [propertyType, setPropertyType] = useState<PropertyType>('residential')
@@ -36,24 +38,15 @@ export default function EditPropertyPage({
 
   // Load property data
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     async function loadProperty() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile?.company_id) throw new Error('No company found')
-
         const { data: property, error: propertyError } = await supabase
           .from('properties')
           .select('*')
           .eq('id', propertyId)
-          .eq('company_id', profile.company_id)
+          .eq('company_id', session.user.company_id)
           .single()
 
         if (propertyError) throw propertyError
@@ -74,7 +67,7 @@ export default function EditPropertyPage({
       }
     }
     loadProperty()
-  }, [propertyId, supabase])
+  }, [propertyId, supabase, session])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { ArrowLeft, Droplets, Gauge, Beaker, Wrench, ClipboardList, Calendar } from 'lucide-react'
 import ServiceHistory from '@/components/ServiceHistory'
@@ -12,25 +13,21 @@ export default async function UnitDetailPage({
 }) {
   // Await params for Next.js 15
   const { id: propertyId, unitId } = await params
-  
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const companyId = headersList.get('x-user-company-id')
+
+  if (!userId) {
     redirect('/login')
   }
-  
-  // Get user's company
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('company_id')
-    .eq('id', user.id)
-    .single()
 
-  if (!profile?.company_id) {
+  if (!companyId) {
     redirect('/onboarding')
   }
+
+  const supabase = await createClient()
 
   // Get unit with property info
   const { data: unit, error } = await supabase

@@ -66,8 +66,8 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    window.location.href = '/login'
+    // Navigate to logout route which clears NextAuth session
+    window.location.href = '/logout'
   }
 
   if (loading) {
