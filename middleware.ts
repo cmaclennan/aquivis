@@ -3,41 +3,40 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-
   // Avoid auth redirects on prefetch requests to prevent navigation bounce
   const isPrefetch =
     req.headers.get('x-middleware-prefetch') === '1' ||
     req.headers.get('next-router-prefetch') === '1' ||
     req.headers.get('purpose') === 'prefetch'
 
+  let res = NextResponse.next({
+    request: {
+      headers: req.headers,
+    },
+  })
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return req.cookies.get(name)?.value
+        getAll() {
+          return req.cookies.getAll()
         },
-        set(name: string, value: string, options: any) {
-          res.cookies.set({
-            name,
-            value,
-            ...options,
-            path: '/',
-            sameSite: 'lax',
-            secure: process.env.NODE_ENV === 'production',
-          })
-        },
-        remove(name: string, options: any) {
-          res.cookies.set({
-            name,
-            value: '',
-            ...options,
-            path: '/',
-            sameSite: 'lax',
-            secure: process.env.NODE_ENV === 'production',
-          })
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              req.cookies.set(name, value)
+            })
+            res = NextResponse.next({
+              request: req,
+            })
+            cookiesToSet.forEach(({ name, value, options }) => {
+              res.cookies.set(name, value, options)
+            })
+          } catch (error) {
+            console.error('[Middleware] Error setting cookies:', error)
+          }
         },
       },
     }
