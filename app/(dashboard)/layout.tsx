@@ -16,7 +16,16 @@ export default async function DashboardLayout({
   // Check NextAuth session
   const session = await auth()
 
+  console.log('[Dashboard Layout] Session check:', {
+    hasSession: !!session,
+    hasUser: !!session?.user,
+    userId: session?.user?.id,
+    role: session?.user?.role,
+    companyId: session?.user?.company_id,
+  })
+
   if (!session?.user) {
+    console.log('[Dashboard Layout] No session/user, redirecting to /login')
     redirect('/login')
   }
 

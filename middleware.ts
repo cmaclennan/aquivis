@@ -27,6 +27,13 @@ export async function middleware(req: NextRequest) {
   const SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
   const token = await getToken({ req, secret: SECRET })
 
+  console.log('[Middleware] Token check:', {
+    pathname,
+    hasToken: !!token,
+    tokenRole: token?.role,
+    secretSource: process.env.AUTH_SECRET ? 'AUTH_SECRET' : 'NEXTAUTH_SECRET',
+  })
+
   // Public routes that don't require auth
   const publicRoutes = ['/login', '/signup', '/super-admin-login', '/customer-portal/login', '/']
 
