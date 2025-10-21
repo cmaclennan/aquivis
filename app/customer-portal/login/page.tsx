@@ -4,12 +4,13 @@ export const dynamic = 'force-dynamic'
 import { Suspense } from 'react'
 
 import { useState, useTransition } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { customerPortalLoginAction } from './actions'
 
 function CustomerLoginInner() {
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const params = useSearchParams()
@@ -21,6 +22,9 @@ function CustomerLoginInner() {
       const result = await customerPortalLoginAction(formData)
       if (result?.error) {
         setError(result.error)
+      } else if (result?.success && result?.redirectTo) {
+        // Client-side redirect after successful login
+        router.push(result.redirectTo)
       }
     })
   }

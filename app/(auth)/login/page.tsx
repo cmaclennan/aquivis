@@ -4,12 +4,13 @@ export const dynamic = 'force-dynamic'
 import { Suspense } from 'react'
 
 import { useState, useTransition } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { loginAction } from './actions'
 
 function LoginInner() {
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const params = useSearchParams()
@@ -22,6 +23,10 @@ function LoginInner() {
       const result = await loginAction(formData)
       if (result?.error) {
         setError(result.error)
+      } else if (result?.success && result?.redirectTo) {
+        // Client-side redirect after successful login
+        // This ensures cookies are properly set before navigation
+        router.push(result.redirectTo)
       }
     })
   }

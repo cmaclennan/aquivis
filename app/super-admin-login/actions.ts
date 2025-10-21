@@ -1,7 +1,6 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import { logger } from '@/lib/logger'
 
 export async function superAdminLoginAction(formData: FormData) {
@@ -106,16 +105,16 @@ export async function superAdminLoginAction(formData: FormData) {
           user_id: data.user.id,
           email: email,
           expires_at: sessionExpiry.toISOString(),
-          ip_address: null, // Could be added from request headers
-          user_agent: null  // Could be added from request headers
+          ip_address: null,
+          user_agent: null
         })
     } catch (sessionError) {
       // Session table might not exist yet, continue anyway
       logger.warn('Failed to create session record', sessionError)
     }
 
-    // Redirect to super admin dashboard
-    redirect('/super-admin')
+    // Return success with redirect URL (client will handle navigation)
+    return { success: true, redirectTo: '/super-admin' }
   }
 
   return { error: 'Login failed' }

@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Shield, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 import { superAdminLoginAction } from './actions'
 
 export default function SuperAdminLoginPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -16,6 +18,9 @@ export default function SuperAdminLoginPage() {
       const result = await superAdminLoginAction(formData)
       if (result?.error) {
         setError(result.error)
+      } else if (result?.success && result?.redirectTo) {
+        // Client-side redirect after successful login
+        router.push(result.redirectTo)
       }
     })
   }

@@ -1,7 +1,6 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 
 export async function customerPortalLoginAction(formData: FormData) {
   const email = formData.get('email') as string
@@ -68,8 +67,8 @@ export async function customerPortalLoginAction(formData: FormData) {
       return { error: 'Access denied: Customer account not found' }
     }
 
-    // Redirect to customer portal
-    redirect('/customer-portal')
+    // Return success with redirect URL (client will handle navigation)
+    return { success: true, redirectTo: '/customer-portal' }
   }
 
   return { error: 'Login failed' }

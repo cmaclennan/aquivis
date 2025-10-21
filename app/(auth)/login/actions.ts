@@ -1,24 +1,21 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 
 export async function loginAction(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const redirectTo = formData.get('redirect') as string || '/dashboard'
 
-  console.log('[LoginAction] Starting login for:', email)
   const supabase = await createClient()
 
   // Check rate limit before attempting login
   const { data: rateLimitCheck } = await supabase.rpc('check_rate_limit', {
     p_email: email,
-    p_ip_address: null // Could be added from request headers
+    p_ip_address: null
   })
 
   if (rateLimitCheck && !rateLimitCheck.allowed) {
-    console.log('[LoginAction] Rate limit exceeded for:', email)
     // Log failed attempt due to rate limit
     await supabase.rpc('log_login_attempt', {
       p_email: email,
@@ -37,10 +34,7 @@ export async function loginAction(formData: FormData) {
     password,
   })
 
-  console.log('[LoginAction] SignIn response - Error:', error?.message, 'User:', data?.user?.email)
-
   if (error) {
-    console.log('[LoginAction] Login failed:', error.message)
     // Log failed login attempt
     await supabase.rpc('log_login_attempt', {
       p_email: email,
@@ -55,7 +49,6 @@ export async function loginAction(formData: FormData) {
   }
 
   if (data.user) {
-    console.log('[LoginAction] Login successful for:', data.user.email, 'Redirecting to:', redirectTo)
     // Log successful login
     await supabase.rpc('log_login_attempt', {
       p_email: email,
@@ -74,15 +67,14 @@ export async function loginAction(formData: FormData) {
       .single()
 
     if (!profile) {
-      console.log('[LoginAction] No profile found, redirecting to onboarding')
-      redirect('/onboarding')
+      // No profile - redirect to onboarding
+      return { success: true, redirectTo: '/onboarding' }
     } else {
-      console.log('[LoginAction] Profile found, redirecting to:', redirectTo)
-      redirect(redirectTo)
+      // Profile exists - redirect to requested page or dashboard
+      return { success: true, redirectTo }
     }
   }
 
-  console.log('[LoginAction] Unexpected: no user and no error')
   return { error: 'Login failed' }
 }
 
