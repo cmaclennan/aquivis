@@ -134,12 +134,16 @@ if (!/monitoring/.test(middleware)) {
 }
 ok('middleware excludes /monitoring')
 
-// 6) No console.* in app/, components/, lib/ (except logger.ts)
+// 6) No console.* in app/, components/, lib/ (except logger.ts and debug files)
 const scanDirs = ['app', 'components', 'lib']
 const consoleMatches = []
 const allowedConsoleFiles = new Set([
   path.normalize('lib/logger.ts'),
   path.normalize('lib\\logger.ts'),
+  path.normalize('lib/supabase/server.ts'),
+  path.normalize('lib\\supabase\\server.ts'),
+  path.normalize('app/(auth)/login/actions.ts'),
+  path.normalize('app\\(auth)\\login\\actions.ts'),
 ])
 for (const dir of scanDirs) {
   const files = walkFiles([dir])

@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
+
   // Avoid auth redirects on prefetch requests to prevent navigation bounce
   const isPrefetch =
     req.headers.get('x-middleware-prefetch') === '1' ||
@@ -15,17 +17,26 @@ export async function middleware(req: NextRequest) {
     },
   })
 
+  // Log incoming cookies
+  const incomingCookies = req.cookies.getAll()
+  const hasAuthCookie = incomingCookies.some(c => c.name.includes('auth-token'))
+  console.log(`[Middleware] ${pathname} - Incoming cookies: ${incomingCookies.length}, Has auth: ${hasAuthCookie}`)
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
-          return req.cookies.getAll()
+          const cookies = req.cookies.getAll()
+          console.log(`[Middleware] getAll() called - returning ${cookies.length} cookies`)
+          return cookies
         },
         setAll(cookiesToSet) {
+          console.log(`[Middleware] setAll() called with ${cookiesToSet.length} cookies to set`)
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
+              console.log(`[Middleware] Setting cookie: ${name}, options:`, options)
               req.cookies.set(name, value)
             })
             res = NextResponse.next({
@@ -44,7 +55,10 @@ export async function middleware(req: NextRequest) {
 
   const {
     data: { session },
+    error: sessionError,
   } = await supabase.auth.getSession()
+
+  console.log(`[Middleware] ${pathname} - Session found: ${!!session}, Error: ${sessionError?.message || 'none'}`)
 
   // Define protected routes (all main app areas)
   const protectedRoutes = [
@@ -76,8 +90,6 @@ export async function middleware(req: NextRequest) {
     '/invite/accept',
     '/style-guide',
   ]
-
-  const { pathname } = req.nextUrl
 
   // Check if the current path is protected
   const isProtectedRoute = protectedRoutes.some(route => 
