@@ -3,15 +3,6 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  // Enforce canonical host early to prevent auth cookie host mismatches
-  const url = req.nextUrl.clone()
-  const host = req.headers.get('host') || ''
-  if (process.env.NODE_ENV === 'production' && host === 'aquivis.co') {
-    url.host = 'www.aquivis.co'
-    url.protocol = 'https:'
-    return NextResponse.redirect(url)
-  }
-
   const res = NextResponse.next()
 
   // Avoid auth redirects on prefetch requests to prevent navigation bounce
@@ -19,7 +10,7 @@ export async function middleware(req: NextRequest) {
     req.headers.get('x-middleware-prefetch') === '1' ||
     req.headers.get('next-router-prefetch') === '1' ||
     req.headers.get('purpose') === 'prefetch'
-  
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -29,7 +20,6 @@ export async function middleware(req: NextRequest) {
           return req.cookies.get(name)?.value
         },
         set(name: string, value: string, options: any) {
-          const domain = process.env.NODE_ENV === 'production' ? '.aquivis.co' : undefined
           res.cookies.set({
             name,
             value,
@@ -37,11 +27,9 @@ export async function middleware(req: NextRequest) {
             path: '/',
             sameSite: 'lax',
             secure: process.env.NODE_ENV === 'production',
-            ...(domain ? { domain } : {}),
           })
         },
         remove(name: string, options: any) {
-          const domain = process.env.NODE_ENV === 'production' ? '.aquivis.co' : undefined
           res.cookies.set({
             name,
             value: '',
@@ -49,7 +37,6 @@ export async function middleware(req: NextRequest) {
             path: '/',
             sameSite: 'lax',
             secure: process.env.NODE_ENV === 'production',
-            ...(domain ? { domain } : {}),
           })
         },
       },
