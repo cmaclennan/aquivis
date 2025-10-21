@@ -15,6 +15,10 @@ if (!NEXTAUTH_URL) {
 }
 
 export const authOptions: NextAuthOptions = {
+  pages: {
+    signIn: '/login',
+    error: '/login',
+  },
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -64,10 +68,6 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  pages: {
-    signIn: '/login',
-    error: '/login',
-  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
@@ -95,6 +95,7 @@ export const authOptions: NextAuthOptions = {
     secret: NEXTAUTH_SECRET,
   },
   secret: NEXTAUTH_SECRET,
+  trustHost: true,
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
