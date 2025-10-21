@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -47,9 +49,9 @@ export default async function DashboardLayout({
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center space-x-3">
             <div className="h-10 w-10 flex-shrink-0 relative">
-              <Image 
-                src="/logo-192.png" 
-                alt="Aquivis Logo" 
+              <Image
+                src="/logo-192.png"
+                alt="Aquivis Logo"
                 width={40}
                 height={40}
                 className="object-contain"
