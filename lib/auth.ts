@@ -1,6 +1,7 @@
 import NextAuth, { type NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { createClient } from '@/lib/supabase/server'
+import logger from '@/lib/logger'
 
 // Validate required environment variables
 const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
@@ -34,12 +35,12 @@ export const authOptions: NextAuthOptions = {
         try {
           // Validate environment variables
           if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-            console.error('[auth] NEXT_PUBLIC_SUPABASE_URL is not set')
+            logger.error('[auth] NEXT_PUBLIC_SUPABASE_URL is not set')
             throw new Error('Configuration error: Missing Supabase URL')
           }
 
           if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-            console.error('[auth] SUPABASE_SERVICE_ROLE_KEY is not set')
+            logger.error('[auth] SUPABASE_SERVICE_ROLE_KEY is not set')
             throw new Error('Configuration error: Missing service role key')
           }
 
@@ -53,12 +54,12 @@ export const authOptions: NextAuthOptions = {
             .single()
 
           if (profileError) {
-            console.error('[auth] Profile query error:', profileError)
+            logger.error('[auth] Profile query error', profileError)
             throw new Error('Invalid credentials')
           }
 
           if (!profile) {
-            console.error('[auth] No profile found for email:', credentials.email)
+            logger.error('[auth] No profile found for email', new Error('Profile not found'), { email: credentials.email })
             throw new Error('Invalid credentials')
           }
 
@@ -82,16 +83,16 @@ export const authOptions: NextAuthOptions = {
           })
 
           if (authError) {
-            console.error('[auth] Password verification error:', authError.message)
+            logger.error('[auth] Password verification error', authError, { email: credentials.email })
             throw new Error('Invalid credentials')
           }
 
           if (!authData.user) {
-            console.error('[auth] No user returned from password verification')
+            logger.error('[auth] No user returned from password verification', new Error('No user data'))
             throw new Error('Invalid credentials')
           }
 
-          console.log('[auth] Login successful for:', credentials.email)
+          logger.info('[auth] Login successful', { email: credentials.email })
 
           // Return user object for NextAuth JWT (NO Supabase session created)
           return {
@@ -101,7 +102,7 @@ export const authOptions: NextAuthOptions = {
             company_id: profile.company_id,
           }
         } catch (error) {
-          console.error('[auth] Authorization error:', error)
+          logger.error('[auth] Authorization error', error)
           throw new Error(error instanceof Error ? error.message : 'Authentication failed')
         }
       },
