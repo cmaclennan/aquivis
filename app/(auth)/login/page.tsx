@@ -3,30 +3,57 @@
 export const dynamic = 'force-dynamic'
 import { Suspense } from 'react'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { loginAction } from './actions'
 
 function LoginInner() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
   const params = useSearchParams()
   const isTimeout = params.get('timeout') === 'true'
 
   const handleLogin = async (formData: FormData) => {
     setError(null)
+    setIsLoading(true)
 
-    startTransition(async () => {
-      const result = await loginAction(formData)
+    try {
+      const email = formData.get('email') as string
+      const password = formData.get('password') as string
+
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
+
       if (result?.error) {
         setError(result.error)
+        setIsLoading(false)
+        return
       }
-      // If successful, loginAction will handle server-side redirect
-      // No need to handle redirect here
-    })
+
+      // Get session to check role and redirect appropriately
+      const response = await fetch('/api/auth/session')
+      const session = await response.json()
+
+      if (session?.user) {
+        // Redirect based on role
+        if (session.user.role === 'super_admin') {
+          router.push('/super-admin')
+        } else if (session.user.company_id) {
+          router.push('/dashboard')
+        } else {
+          router.push('/onboarding')
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed')
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -107,10 +134,10 @@ function LoginInner() {
 
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isLoading}
               className="w-full rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
             >
-              {isPending ? 'Signing in...' : 'Sign In'}
+              {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
