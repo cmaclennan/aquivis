@@ -1,37 +1,30 @@
 export const dynamic = 'force-dynamic'
 
-import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import Image from 'next/image'
 import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut, Droplets, Settings, BarChart3, Calendar } from 'lucide-react'
-import { SessionTimeoutHandler } from '@/components/auth/SessionTimeoutHandler'
-import { logger } from '@/lib/logger'
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Check NextAuth session
-  const session = await auth()
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userRole = headersList.get('x-user-role')
+  const companyId = headersList.get('x-user-company-id')
 
-  logger.info('[Dashboard Layout] Session check', {
-    hasSession: !!session,
-    hasUser: !!session?.user,
-    userId: session?.user?.id,
-    role: session?.user?.role,
-    companyId: session?.user?.company_id,
-  })
-
-  if (!session?.user) {
-    logger.warn('[Dashboard Layout] No session/user, redirecting to /login')
+  // If no user data in headers, middleware didn't authenticate (shouldn't happen)
+  if (!userId) {
     redirect('/login')
   }
 
-  // Verify user has company_id (not super admin)
-  if (!session.user.company_id) {
+  // Verify user has company_id (not super admin without company)
+  if (!companyId) {
     redirect('/onboarding')
   }
 
@@ -40,7 +33,7 @@ export default async function DashboardLayout({
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
-    .eq('id', session.user.id)
+    .eq('id', userId)
     .single()
 
   if (!profile?.company_id) {
@@ -48,11 +41,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <>
-      {/* Session Timeout Handler - 60 min timeout, 5 min warning */}
-      <SessionTimeoutHandler timeoutMinutes={60} warningMinutes={5} />
-
-      <div className="flex min-h-screen app-surface">
+    <div className="flex min-h-screen app-surface">
         {/* Sidebar */}
         <aside className="flex w-64 flex-col bg-white/95 backdrop-blur border-r border-gray-300 shadow-lg z-10">
         {/* Logo & Company Name */}
@@ -168,12 +157,11 @@ export default async function DashboardLayout({
         </div>
       </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
-      </div>
-    </>
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto">
+        {children}
+      </main>
+    </div>
   )
 }
 

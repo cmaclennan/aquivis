@@ -1,23 +1,33 @@
-import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { SessionTimeoutWrapper } from '@/components/auth/SessionTimeoutWrapper'
+import { createClient } from '@/lib/supabase/server'
 
 export default async function CustomerPortalLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Check NextAuth session
-  const session = await auth()
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userEmail = headersList.get('x-user-email')
 
-  if (!session?.user) {
+  // If no user data in headers, middleware didn't authenticate
+  if (!userId) {
     redirect('/customer-portal/login')
   }
 
+  // Get user profile for display
+  const supabase = await createClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email, first_name, last_name')
+    .eq('id', userId)
+    .single()
+
   return (
-    <SessionTimeoutWrapper timeoutMinutes={60} warningMinutes={5}>
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
         <nav className="bg-white shadow-sm">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex h-16 justify-between">
@@ -49,7 +59,9 @@ export default async function CustomerPortalLayout({
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600 hidden sm:block">{profile.email}</span>
+                <span className="text-sm text-gray-600 hidden sm:block">
+                  {profile?.email || userEmail}
+                </span>
                 <a
                   href="/logout"
                   className="rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
@@ -64,7 +76,6 @@ export default async function CustomerPortalLayout({
           {children}
         </main>
       </div>
-    </SessionTimeoutWrapper>
   )
 }
 
