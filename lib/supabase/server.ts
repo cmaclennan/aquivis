@@ -11,19 +11,15 @@ export async function createClient() {
     {
       cookies: {
         getAll() {
-          const allCookies = cookieStore.getAll()
-          console.log('[ServerClient] getAll() - returning', allCookies.length, 'cookies')
-          return allCookies
+          return cookieStore.getAll()
         },
         setAll(cookiesToSet) {
-          console.log('[ServerClient] setAll() - setting', cookiesToSet.length, 'cookies')
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              console.log('[ServerClient] Setting cookie:', name, 'with options:', options)
               cookieStore.set(name, value, options)
             })
           } catch (error) {
-            console.error('[ServerClient] Error setting cookies:', error)
+            // Silently fail - server component
           }
         },
       },

@@ -30,12 +30,11 @@ export default function ProtectedLayout({
     const checkAuth = async () => {
       try {
         const supabase = createClient()
-        
+
         // Get the current session
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) {
-          console.error('[ProtectedLayout] Auth error:', error)
           setIsAuthenticated(false)
           setIsLoading(false)
           router.push('/login')
@@ -43,18 +42,15 @@ export default function ProtectedLayout({
         }
 
         if (!session) {
-          console.log('[ProtectedLayout] No session found, redirecting to login')
           setIsAuthenticated(false)
           setIsLoading(false)
           router.push('/login')
           return
         }
 
-        console.log('[ProtectedLayout] Session found for user:', session.user.email)
         setIsAuthenticated(true)
         setIsLoading(false)
       } catch (error) {
-        console.error('[ProtectedLayout] Unexpected error:', error)
         setIsAuthenticated(false)
         setIsLoading(false)
         router.push('/login')
