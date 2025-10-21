@@ -1,9 +1,19 @@
 # Supabase Configuration
 # Get these values from: https://supabase.com → Your Project → Settings → API
-NEXT_PUBLIC_SUPABASE_URL=https://krxabrdizqbpitpsvgiv.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtyeGFicmRpenFicGl0cHN2Z2l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyODM1MTIsImV4cCI6MjA3NDg1OTUxMn0.Og1vlRLR4dEMRvYF4POSifY-oxuCEIqifBlWh4q5Kng
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url_here
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 
 # Email Configuration
 # Get this from: https://resend.com → API Keys
-RESEND_API_KEY=re_4iiLMnUg_JNpvJ5dAdRKvxvhpAiEmg3Po
-EMAIL_FROM=noreply@aquivis.co
+RESEND_API_KEY=your_resend_api_key_here
+EMAIL_FROM=noreply@yourdomain.com
+
+# Sentry Configuration (Optional)
+# Get from: https://sentry.io → Settings → Projects → [Your Project] → Client Keys (DSN)
+NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn_here
+SENTRY_AUTH_TOKEN=your_sentry_auth_token_here
+SENTRY_ORG=your_sentry_org_here
+SENTRY_PROJECT=your_sentry_project_here
+
+# Application Configuration
+NEXT_PUBLIC_APP_URL=http://localhost:3000

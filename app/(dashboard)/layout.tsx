@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut, Droplets, Settings, BarChart3, Calendar } from 'lucide-react'
+import { SessionTimeoutHandler } from '@/components/auth/SessionTimeoutHandler'
 
 export default async function DashboardLayout({
   children,
@@ -30,9 +31,13 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen app-surface">
-      {/* Sidebar */}
-      <aside className="flex w-64 flex-col bg-white/95 backdrop-blur border-r border-gray-300 shadow-lg z-10">
+    <>
+      {/* Session Timeout Handler - 60 min timeout, 5 min warning */}
+      <SessionTimeoutHandler timeoutMinutes={60} warningMinutes={5} />
+
+      <div className="flex min-h-screen app-surface">
+        {/* Sidebar */}
+        <aside className="flex w-64 flex-col bg-white/95 backdrop-blur border-r border-gray-300 shadow-lg z-10">
         {/* Logo & Company Name */}
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center space-x-3">
@@ -146,11 +151,12 @@ export default async function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
-    </div>
+        {/* Main Content */}
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
+      </div>
+    </>
   )
 }
 

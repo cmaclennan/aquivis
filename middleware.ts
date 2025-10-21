@@ -67,6 +67,7 @@ export async function middleware(req: NextRequest) {
   const protectedRoutes = [
     '/dashboard',
     '/customers',
+    '/customer-portal',
     '/properties',
     '/services',
     '/jobs',
@@ -87,7 +88,6 @@ export async function middleware(req: NextRequest) {
     '/',
     '/login',
     '/signup',
-    '/customer-portal',
     '/customer-portal/login',
     '/super-admin-login',
     '/invite/accept',

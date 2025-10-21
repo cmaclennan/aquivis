@@ -6,16 +6,16 @@ import Link from 'next/link'
 export default async function PropertiesPage({
   searchParams,
 }: {
-  searchParams?: { [key: string]: string | string[] | undefined }
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const supabase = await createClient()
-  
+
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (!user) {
     redirect('/login')
   }
-  
+
   // Get user's company
   const { data: profile } = await supabase
     .from('profiles')
@@ -27,8 +27,9 @@ export default async function PropertiesPage({
     redirect('/onboarding')
   }
 
-  // Pagination
-  const pageParam = (searchParams?.page as string) || '1'
+  // Pagination - await searchParams
+  const params = await searchParams
+  const pageParam = (params?.page as string) || '1'
   const page = Math.max(1, Number(pageParam) || 1)
   const pageSize = 24
   const from = (page - 1) * pageSize

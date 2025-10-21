@@ -14,20 +14,34 @@ export default function ReactQueryProvider({
       new QueryClient({
         defaultOptions: {
           queries: {
-            // With SSR, we usually want to set some default staleTime
-            // above 0 to avoid refetching immediately on the client
-            staleTime: 60 * 1000, // 1 minute
-            gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
+            // Stale time: Data is considered fresh for 5 minutes
+            // This prevents unnecessary refetches when navigating
+            staleTime: 5 * 60 * 1000,
+
+            // Cache time: Data stays in cache for 10 minutes after becoming unused
+            gcTime: 10 * 60 * 1000,
+
+            // Retry logic: Smart retry based on error type
             retry: (failureCount, error: any) => {
-              // Don't retry on 4xx errors
+              // Don't retry on 4xx errors (client errors)
               if (error?.status >= 400 && error?.status < 500) {
                 return false
               }
-              // Retry up to 3 times for other errors
-              return failureCount < 3
+              // Retry up to 2 times for server errors
+              return failureCount < 2
             },
+
+            // Refetch on window focus for real-time updates
+            refetchOnWindowFocus: true,
+
+            // Refetch on reconnect
+            refetchOnReconnect: true,
+
+            // Don't refetch on mount if data is fresh
+            refetchOnMount: false,
           },
           mutations: {
+            // Don't retry mutations by default (avoid duplicate operations)
             retry: false,
           },
         },
@@ -37,7 +51,10 @@ export default function ReactQueryProvider({
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      <ReactQueryDevtools initialIsOpen={false} />
+      {/* Only show devtools in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
     </QueryClientProvider>
   )
 }

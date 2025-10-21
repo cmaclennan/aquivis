@@ -1,67 +1,23 @@
 'use client'
 
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
 import { Shield, Eye, EyeOff, AlertTriangle } from 'lucide-react'
+import { superAdminLoginAction } from './actions'
 
 export default function SuperAdminLoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
-  const router = useRouter()
-  const supabase = createClient()
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  const handleSubmit = async (formData: FormData) => {
     setError(null)
 
-    try {
-      // Sign in with email and password
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) throw error
-
-      if (data.user) {
-        // Check if user is super admin
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single()
-
-        if (profileError) throw profileError
-
-        if (profile?.role !== 'super_admin') {
-          // Sign out if not super admin
-          await supabase.auth.signOut()
-          throw new Error('Access denied: Super admin privileges required')
-        }
-
-        // Log super admin login
-        await supabase.rpc('log_super_admin_action', {
-          p_action_type: 'login',
-          p_table_name: null,
-          p_record_id: null,
-          p_company_id: null,
-          p_details: { email, login_method: 'password' }
-        })
-
-        // Redirect to super admin dashboard
-        router.push('/super-admin')
+    startTransition(async () => {
+      const result = await superAdminLoginAction(formData)
+      if (result?.error) {
+        setError(result.error)
       }
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+    })
   }
 
   return (
@@ -81,7 +37,7 @@ export default function SuperAdminLoginPage() {
         </div>
 
         {/* Login Form */}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" action={handleSubmit}>
           {error && (
             <div className="rounded-lg bg-red-50 p-4">
               <div className="flex items-center space-x-2">
@@ -102,8 +58,6 @@ export default function SuperAdminLoginPage() {
                 type="email"
                 autoComplete="email"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
                 placeholder="admin@aquivis.com"
               />
@@ -120,8 +74,6 @@ export default function SuperAdminLoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                   className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-200"
                   placeholder="Enter password"
                 />
@@ -143,10 +95,10 @@ export default function SuperAdminLoginPage() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isPending}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? (
+              {isPending ? (
                 <>
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
                   Signing in...

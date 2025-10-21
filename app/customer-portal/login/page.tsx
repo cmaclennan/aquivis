@@ -3,43 +3,26 @@
 export const dynamic = 'force-dynamic'
 import { Suspense } from 'react'
 
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useTransition } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+import { customerPortalLoginAction } from './actions'
 
 function CustomerLoginInner() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
   const params = useSearchParams()
-  const supabase = createClient()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  const handleLogin = async (formData: FormData) => {
     setError(null)
 
-    try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (signInError) throw signInError
-
-      if (data.user) {
-        const redirect = params.get('redirect')
-        router.push(redirect || '/customer-portal')
+    startTransition(async () => {
+      const result = await customerPortalLoginAction(formData)
+      if (result?.error) {
+        setError(result.error)
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to sign in')
-    } finally {
-      setLoading(false)
-    }
+    })
   }
 
   return (
@@ -62,15 +45,14 @@ function CustomerLoginInner() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form action={handleLogin} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
               <input
                 id="email"
+                name="email"
                 type="email"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="your.email@example.com"
               />
@@ -80,10 +62,9 @@ function CustomerLoginInner() {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
               <input
                 id="password"
+                name="password"
                 type="password"
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="••••••••"
               />
@@ -91,10 +72,10 @@ function CustomerLoginInner() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isPending}
               className="w-full rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {isPending ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 

@@ -3,57 +3,27 @@
 export const dynamic = 'force-dynamic'
 import { Suspense } from 'react'
 
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useTransition } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+import { loginAction } from './actions'
 
 function LoginInner() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
   const params = useSearchParams()
-  const supabase = createClient()
+  const isTimeout = params.get('timeout') === 'true'
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  const handleLogin = async (formData: FormData) => {
     setError(null)
 
-    try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (signInError) throw signInError
-
-      if (data.user) {
-        // Check if user has a company profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id, role')
-          .eq('id', data.user.id)
-          .single()
-
-        if (!profile) {
-          // New user - need to create company
-          const redirect = params.get('redirect')
-          router.push(redirect || '/onboarding')
-        } else {
-          // Existing user - go to dashboard
-          const redirect = params.get('redirect')
-          router.push(redirect || '/dashboard')
-        }
+    startTransition(async () => {
+      const result = await loginAction(formData)
+      if (result?.error) {
+        setError(result.error)
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to sign in')
-    } finally {
-      setLoading(false)
-    }
+    })
   }
 
   return (
@@ -78,23 +48,40 @@ function LoginInner() {
         <div className="rounded-xl bg-white p-8 shadow-md border border-gray-200">
           <h2 className="mb-6 text-2xl font-semibold text-gray-900">Sign In</h2>
 
+          {isTimeout && (
+            <div className="mb-4 rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-800">
+              <div className="flex items-center space-x-2">
+                <svg className="h-5 w-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="font-medium">Your session has expired due to inactivity. Please sign in again.</span>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 rounded-lg bg-error-light p-3 text-sm text-error">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form action={handleLogin} className="space-y-4">
+            <input
+              type="hidden"
+              name="redirect"
+              value={params.get('redirect') || '/dashboard'}
+            />
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email
               </label>
               <input
                 id="email"
+                name="email"
                 type="email"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
                 className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="your.email@company.com"
               />
@@ -106,10 +93,10 @@ function LoginInner() {
               </label>
               <input
                 id="password"
+                name="password"
                 type="password"
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
                 className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="••••••••"
               />
@@ -117,10 +104,10 @@ function LoginInner() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isPending}
               className="w-full rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {isPending ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
