@@ -176,8 +176,19 @@ export default function SchedulePage({}: Props) {
     const map: Record<string, number> = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 }
     return map[(dayName || '').toLowerCase()] === d.getDay()
   }
-  const unitHasServiceBetween = async (_unitId: string, _start: string, _end: string) => {
-    return false
+  const unitHasServiceBetween = async (unitId: string, start: string, end: string) => {
+    try {
+      const params = new URLSearchParams()
+      params.set('unitId', unitId)
+      params.set('startDate', start)
+      params.set('endDate', end)
+      params.set('limit', '1')
+      const res = await fetch(`/api/services?${params.toString()}`)
+      const json = await res.json().catch(() => ({}))
+      return !!(res.ok && !json?.error && Array.isArray(json.services) && json.services.length > 0)
+    } catch {
+      return false
+    }
   }
 
   // Deterministic RNG from seed

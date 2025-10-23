@@ -15,11 +15,13 @@
 -- ============================================
 
 -- ============================================
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 -- CUSTOM SCHEDULES (Unit-Level)
 -- ============================================
 
 -- Custom schedules for individual units
-CREATE TABLE custom_schedules (
+CREATE TABLE IF NOT EXISTS custom_schedules (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   unit_id UUID REFERENCES units(id) ON DELETE CASCADE,
   
@@ -36,10 +38,10 @@ CREATE TABLE custom_schedules (
   
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
   
   -- Ensure one active schedule per unit
-  UNIQUE(unit_id) WHERE is_active = true
+  -- Enforced via partial unique index below
 );
 
 -- ============================================
@@ -47,7 +49,7 @@ CREATE TABLE custom_schedules (
 -- ============================================
 
 -- Property-level scheduling rules for complex scenarios
-CREATE TABLE property_scheduling_rules (
+CREATE TABLE IF NOT EXISTS property_scheduling_rules (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
   
@@ -78,7 +80,7 @@ CREATE TABLE property_scheduling_rules (
 -- ============================================
 
 -- Reusable schedule templates for common patterns
-CREATE TABLE schedule_templates (
+CREATE TABLE IF NOT EXISTS schedule_templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
   
@@ -106,7 +108,7 @@ CREATE TABLE schedule_templates (
 -- ============================================
 
 -- Log of schedule executions for audit and debugging
-CREATE TABLE schedule_executions (
+CREATE TABLE IF NOT EXISTS schedule_executions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
   unit_id UUID REFERENCES units(id) ON DELETE SET NULL,
@@ -131,22 +133,23 @@ CREATE TABLE schedule_executions (
 -- ============================================
 
 -- Custom schedules indexes
-CREATE INDEX idx_custom_schedules_unit_id ON custom_schedules(unit_id);
-CREATE INDEX idx_custom_schedules_active ON custom_schedules(is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_custom_schedules_unit_id ON custom_schedules(unit_id);
+CREATE INDEX IF NOT EXISTS idx_custom_schedules_active ON custom_schedules(is_active) WHERE is_active = true;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_custom_schedules_one_active_per_unit ON custom_schedules(unit_id) WHERE is_active = true;
 
 -- Property scheduling rules indexes
-CREATE INDEX idx_property_rules_property_id ON property_scheduling_rules(property_id);
-CREATE INDEX idx_property_rules_active ON property_scheduling_rules(is_active) WHERE is_active = true;
-CREATE INDEX idx_property_rules_priority ON property_scheduling_rules(priority DESC);
+CREATE INDEX IF NOT EXISTS idx_property_rules_property_id ON property_scheduling_rules(property_id);
+CREATE INDEX IF NOT EXISTS idx_property_rules_active ON property_scheduling_rules(is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_property_rules_priority ON property_scheduling_rules(priority DESC);
 
 -- Schedule templates indexes
-CREATE INDEX idx_schedule_templates_company_id ON schedule_templates(company_id);
-CREATE INDEX idx_schedule_templates_active ON schedule_templates(is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_schedule_templates_company_id ON schedule_templates(company_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_templates_active ON schedule_templates(is_active) WHERE is_active = true;
 
 -- Schedule executions indexes
-CREATE INDEX idx_schedule_executions_date ON schedule_executions(execution_date);
-CREATE INDEX idx_schedule_executions_property_id ON schedule_executions(property_id);
-CREATE INDEX idx_schedule_executions_unit_id ON schedule_executions(unit_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_executions_date ON schedule_executions(execution_date);
+CREATE INDEX IF NOT EXISTS idx_schedule_executions_property_id ON schedule_executions(property_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_executions_unit_id ON schedule_executions(unit_id);
 
 -- ============================================
 -- HELPER FUNCTIONS
