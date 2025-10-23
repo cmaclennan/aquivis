@@ -29,6 +29,7 @@ export async function GET(
       .from('units' as any)
       .select(`
         id,
+        created_at,
         unit_number,
         name,
         unit_type,

@@ -1,4 +1,3 @@
-import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { Settings, Building2, CreditCard, Bell, Shield, Users } from 'lucide-react'
@@ -24,13 +23,10 @@ export default async function SettingsPage() {
     redirect('/dashboard')
   }
 
-  const supabase = createAdminClient()
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*, companies(*)')
-    .eq('id', userId)
-    .single()
+  const isOwner = userRole === 'owner'
+  const res = await fetch('/api/company', { cache: 'no-store' })
+  const json = await res.json().catch(() => ({}))
+  const company = res.ok && !json?.error ? json.company : null
 
   return (
     <div className="p-8">
@@ -73,7 +69,7 @@ export default async function SettingsPage() {
               <Shield className="h-5 w-5 mr-3 text-gray-400" />
               Security & Access
             </a>
-            {profile?.role === 'owner' && (
+            {isOwner && (
               <a
                 href="/team"
                 className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
@@ -88,7 +84,7 @@ export default async function SettingsPage() {
         {/* Settings Content */}
         <div className="lg:col-span-2">
           {/* Company Information */}
-          <CompanySettingsSection company={profile?.companies} />
+          <CompanySettingsSection company={company} />
 
           {/* Subscription & Billing */}
           <div id="subscription" className="mt-8 bg-white shadow rounded-lg">
@@ -103,17 +99,17 @@ export default async function SettingsPage() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-900">Current Plan</h3>
                   <p className="text-sm text-gray-600">
-                    {profile?.companies?.subscription_tier || 'Starter'} Plan
+                    {company?.subscription_tier || 'Starter'} Plan
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-medium text-gray-900">Status</p>
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    profile?.companies?.subscription_status === 'active'
+                    company?.subscription_status === 'active'
                       ? 'bg-green-100 text-green-800'
                       : 'bg-yellow-100 text-yellow-800'
                   }`}>
-                    {profile?.companies?.subscription_status || 'Trial'}
+                    {company?.subscription_status || 'Trial'}
                   </span>
                 </div>
               </div>

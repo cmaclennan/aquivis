@@ -1,4 +1,3 @@
-import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import Link from 'next/link'
@@ -27,52 +26,49 @@ export default async function UnitDetailPage({
     redirect('/onboarding')
   }
 
-  const supabase = createAdminClient()
-
-  // Get unit with property info
-  const { data: unit, error } = await supabase
-    .from('units')
-    .select(`
-      *,
-      property:properties!inner(
-        id,
-        name,
-        company_id
-      )
-    `)
-    .eq('id', unitId)
-    .eq('property_id', propertyId)
-    .single()
-
-  if (error || !unit || unit.property.company_id !== companyId) {
+  // Get unit with property info via server API
+  const unitRes = await fetch(`/api/units/${unitId}`, { cache: 'no-store' })
+  const unitJson = await unitRes.json().catch(() => ({}))
+  if (!unitRes.ok || unitJson?.error || !unitJson?.unit) {
+    notFound()
+  }
+  const unit = unitJson.unit as any
+  if (!unit?.property || unit.property.id !== propertyId) {
     notFound()
   }
 
-  // Load current custom schedule if applicable
+  // Load current custom schedule if applicable via API
   let customSchedule: any = null
   if (unit.service_frequency === 'custom') {
-    const { data } = await supabase
-      .from('custom_schedules')
-      .select('schedule_type, schedule_config, service_types, name, description')
-      .eq('unit_id', unitId)
-      .eq('is_active', true)
-      .maybeSingle()
-    customSchedule = data
+    const schedRes = await fetch(`/api/units/${unitId}/custom-schedule`, { cache: 'no-store' })
+    const schedJson = await schedRes.json().catch(() => ({}))
+    customSchedule = schedRes.ok && !schedJson?.error ? (schedJson.schedule || null) : null
   }
 
-  // Get latest service and equipment count
-  const { data: latestService } = await supabase
-    .from('services')
-    .select('id, service_date, service_type, status')
-    .eq('unit_id', unitId)
-    .order('service_date', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // Get latest service and equipment count via API
+  let latestService: any = null
+  {
+    const sRes = await fetch(`/api/services?unitId=${unitId}&limit=1`, { cache: 'no-store' })
+    const sJson = await sRes.json().catch(() => ({}))
+    if (sRes.ok && !sJson?.error && Array.isArray(sJson.services) && sJson.services.length > 0) {
+      const s = sJson.services[0]
+      latestService = {
+        id: s.id,
+        service_date: s.service_date,
+        service_type: s.service_type,
+        status: s.status,
+      }
+    }
+  }
 
-  const { count: equipmentCount } = await supabase
-    .from('equipment')
-    .select('*', { count: 'exact', head: true })
-    .eq('unit_id', unitId)
+  let equipmentCount = 0
+  {
+    const eRes = await fetch(`/api/equipment?unitId=${unitId}`, { cache: 'no-store' })
+    const eJson = await eRes.json().catch(() => ({}))
+    if (eRes.ok && !eJson?.error && Array.isArray(eJson.equipment)) {
+      equipmentCount = eJson.equipment.length
+    }
+  }
 
   return (
     <div className="p-8">
