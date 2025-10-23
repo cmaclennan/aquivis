@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Building2, MapPin, Phone, Mail, User } from 'lucide-react'
 import Link from 'next/link'
@@ -12,7 +11,6 @@ type PropertyType = 'residential' | 'commercial' | 'resort' | 'body_corporate'
 export default function NewPropertyPage() {
   const router = useRouter()
   const { data: session } = useSession()
-  const supabase = createClient()
 
   // Form state
   const [name, setName] = useState('')
@@ -33,15 +31,10 @@ export default function NewPropertyPage() {
     setError(null)
 
     try {
-      if (!session?.user?.company_id) {
-        throw new Error('Not authenticated or no company found')
-      }
-
-      // Create property
-      const { data: property, error: propertyError } = await supabase
-        .from('properties')
-        .insert({
-          company_id: session.user.company_id,
+      const res = await fetch('/api/properties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: name.trim(),
           property_type: propertyType,
           has_individual_units: hasIndividualUnits,
@@ -50,14 +43,11 @@ export default function NewPropertyPage() {
           contact_email: contactEmail.trim() || null,
           contact_phone: contactPhone.trim() || null,
           notes: notes.trim() || null,
-        })
-        .select()
-        .single()
-
-      if (propertyError) throw propertyError
-
-      // Success - redirect to property detail page
-      router.push(`/properties/${property.id}`)
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to create property')
+      router.push(`/properties/${json.property.id}`)
     } catch (err: any) {
       setError(err.message || 'Failed to create property')
     } finally {

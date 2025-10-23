@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import { Calendar, Clock, User, Home, Droplets, Settings, CheckCircle, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -38,7 +37,6 @@ export default function SchedulePage({}: Props) {
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('all')
 
   const { data: session } = useSession()
-  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     // Load persisted property filter
@@ -57,276 +55,22 @@ export default function SchedulePage({}: Props) {
 
     try {
       setLoading(true)
-
-      // Get all properties for the company
-      const { data: properties, error: propertiesError } = await supabase
-        .from('properties')
-        .select('id, name')
-        .eq('company_id', session.user.company_id)
-
-      if (propertiesError) throw propertiesError
-
-      const scheduledTasks: ScheduledTask[] = []
-      setPropertiesState(properties || [])
-
-      // Load technicians (profiles) for filter
-      const { data: techs } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, role, company_id')
-        .eq('company_id', session.user.company_id)
-      setTechnicians(
-        (techs || [])
-          .filter((p: any) => ['technician', 'tech', 'staff'].includes((p.role || '').toLowerCase()))
-          .map((p: any) => ({ id: p.id, name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Technician' }))
-      )
-
-      // Get regular service schedules
-      for (const property of (properties || []).filter(p => selectedPropertyId === 'all' || p.id === selectedPropertyId)) {
-        // Fetch active property-level scheduling rules (if any)
-        const { data: propertyRules } = await supabase
-          .from('property_scheduling_rules')
-          .select('id, rule_name, rule_type, rule_config, target_units, target_water_types, target_unit_types, priority, is_active')
-          .eq('property_id', property.id)
-          .eq('is_active', true)
-
-        // Get units with regular service schedules
-        const { data: units, error: unitsError } = await supabase
-          .from('units')
-          .select('id, name, unit_type, service_frequency, water_type')
-          .eq('property_id', property.id)
-          .eq('is_active', true)
-
-        if (unitsError) throw unitsError
-
-        const propertyHasActiveRules = !!(propertyRules && propertyRules.length)
-        const sharedFacilityTypes = new Set(['main_pool', 'kids_pool', 'main_spa'])
-
-        for (const unit of units || []) {
-          // If property-level rules are active, skip unit-level schedules for shared facilities
-          if (propertyHasActiveRules && sharedFacilityTypes.has((unit.unit_type || '').toString())) {
-            continue
-          }
-          // Check if unit is occupied (has active booking)
-          const { data: activeBooking } = await supabase
-            .from('bookings')
-            .select('check_in_date, check_out_date')
-            .eq('unit_id', unit.id)
-            .lte('check_in_date', selectedDate)
-            .gte('check_out_date', selectedDate)
-            .maybeSingle()
-
-          // Check if today is an arrival for this unit
-          const { data: arrivalToday } = await supabase
-            .from('bookings')
-            .select('id')
-            .eq('unit_id', unit.id)
-            .eq('check_in_date', selectedDate)
-            .limit(1)
-
-          // If unit uses custom schedule, evaluate that first
-          if (unit.service_frequency === 'custom') {
-            const { data: customSchedule } = await supabase
-              .from('custom_schedules')
-              .select('schedule_type, schedule_config, service_types, name')
-              .eq('unit_id', unit.id)
-              .eq('is_active', true)
-              .maybeSingle()
-
-            if (customSchedule) {
-              const customTasks = generateTasksFromCustomSchedule(
-                customSchedule,
-                unit,
-                property,
-                selectedDate,
-                !!activeBooking
-              )
-
-              for (const t of customTasks) {
-                scheduledTasks.push({
-                  ...t,
-                  status: 'pending',
-                  priority: activeBooking ? 'high' : 'medium',
-                  is_occupied: !!activeBooking,
-                  booking_source: undefined,
-                })
-              }
-
-              // Occupancy rules
-              const occ = customSchedule.schedule_config?.occupancy_rules
-              if (occ) {
-                // Arrival task
-                if (occ.on_arrival && arrivalToday && arrivalToday.length) {
-                  scheduledTasks.push({
-                    id: `arrival-${unit.id}-${selectedDate}`,
-                    type: 'service',
-                    unit_id: unit.id,
-                    property_id: property.id,
-                    property_name: property.name,
-                    unit_name: unit.name,
-                    unit_type: unit.unit_type,
-                    service_type: (customSchedule.service_types?.daily?.[0]) || 'full_service',
-                    scheduled_time: customSchedule.schedule_config?.time_preference || '09:00',
-                    status: 'pending',
-                    priority: 'high',
-                    is_occupied: !!activeBooking,
-                    booking_source: undefined,
-                  })
-                }
-                // Weekly minimum
-                if (occ.weekly_minimum) {
-                  const weekStart = getWeekStart(selectedDate)
-                  const weekEnd = getWeekEnd(selectedDate)
-                  const already = await unitHasServiceBetween(unit.id, weekStart, weekEnd)
-                  if (!already && isDay(selectedDate, occ.weekly_day)) {
-                    scheduledTasks.push({
-                      id: `weeklymin-${unit.id}-${selectedDate}`,
-                      type: 'service',
-                      unit_id: unit.id,
-                      property_id: property.id,
-                      property_name: property.name,
-                      unit_name: unit.name,
-                      unit_type: unit.unit_type,
-                      service_type: 'full_service',
-                      scheduled_time: '10:00',
-                      status: 'pending',
-                      priority: activeBooking ? 'high' : 'medium',
-                      is_occupied: !!activeBooking,
-                      booking_source: undefined,
-                    })
-                  }
-                }
-                // Bi-weekly minimum
-                if (occ.biweekly_minimum) {
-                  const period = getBiWeeklyPeriod(selectedDate)
-                  const already = await unitHasServiceBetween(unit.id, period.start, period.end)
-                  if (!already && isDay(selectedDate, occ.biweekly_day)) {
-                    scheduledTasks.push({
-                      id: `biweeklymin-${unit.id}-${selectedDate}`,
-                      type: 'service',
-                      unit_id: unit.id,
-                      property_id: property.id,
-                      property_name: property.name,
-                      unit_name: unit.name,
-                      unit_type: unit.unit_type,
-                      service_type: 'full_service',
-                      scheduled_time: '10:00',
-                      status: 'pending',
-                      priority: activeBooking ? 'high' : 'medium',
-                      is_occupied: !!activeBooking,
-                      booking_source: undefined,
-                    })
-                  }
-                }
-              }
-              continue // Skip default frequency handling for this unit
-            }
-          }
-
-          // Fallback to basic frequency handling
-          const needsService = shouldServiceToday(unit.service_frequency as string, selectedDate, !!activeBooking)
-          if (needsService) {
-            scheduledTasks.push({
-              id: `service-${unit.id}-${selectedDate}`,
-              type: 'service',
-              unit_id: unit.id,
-              property_id: property.id,
-              property_name: property.name,
-              unit_name: unit.name,
-              unit_type: unit.unit_type,
-              service_type: 'full_service',
-              scheduled_time: '09:00',
-              status: 'pending',
-              priority: activeBooking ? 'high' : 'medium',
-              is_occupied: !!activeBooking,
-              booking_source: undefined,
-            })
-          }
-        }
-
-        // Apply property-level rules (e.g., random selection)
-        if (propertyRules && propertyRules.length && units && units.length) {
-          const ruleTasks = generateTasksFromPropertyRules(
-            propertyRules,
-            units,
-            property,
-            selectedDate
-          )
-          for (const t of ruleTasks) {
-            scheduledTasks.push({ ...t, status: 'pending', priority: 'high' })
-          }
-        }
-
-        // Get plant rooms that need checks
-        const { data: plantRooms, error: plantRoomsError } = await supabase
-          .from('plant_rooms')
-          .select('id, name, check_frequency, check_times, check_days')
-          .eq('property_id', property.id)
-          .eq('is_active', true)
-
-        if (plantRoomsError) throw plantRoomsError
-
-        for (const plantRoom of plantRooms || []) {
-          // Check if this plant room needs checking today
-          const days = Array.isArray(plantRoom.check_days) ? plantRoom.check_days : undefined
-          const needsCheck = shouldCheckToday(plantRoom.check_frequency, selectedDate, days)
-          
-          if (needsCheck) {
-            const checkTimes = plantRoom.check_times || ['09:00', '15:00']
-            
-            for (const time of checkTimes) {
-              scheduledTasks.push({
-                id: `plant-${plantRoom.id}-${selectedDate}-${time}`,
-                type: 'plant_check',
-                plant_room_id: plantRoom.id,
-                property_id: property.id,
-                property_name: property.name,
-                plant_room_name: plantRoom.name,
-                scheduled_time: time,
-                status: 'pending',
-                priority: 'high'
-              })
-            }
-          }
-        }
-
-        // Equipment maintenance tasks
-        const equipTasks = await generateEquipmentTasks(property.id, property.name, selectedDate)
-        for (const t of equipTasks) {
-          scheduledTasks.push(t)
-        }
-      }
-
-      // De-duplicate tasks (prefer higher priority), then sort by priority and time
-      const dedupedMap = new Map<string, ScheduledTask>()
-      for (const t of scheduledTasks) {
-        const key = t.type === 'plant_check'
-          ? `plant:${t.plant_room_id}:${t.scheduled_time}:${selectedDate}`
-          : `svc:${t.unit_id}:${t.service_type}:${t.scheduled_time}:${selectedDate}`
-        const existing = dedupedMap.get(key)
-        if (!existing) {
-          dedupedMap.set(key, t)
-        } else {
-          const order = { high: 3, medium: 2, low: 1 } as const
-          dedupedMap.set(key, (order[t.priority] >= order[existing.priority]) ? t : existing)
-        }
-      }
-      const dedupedTasks = Array.from(dedupedMap.values())
-
-      dedupedTasks.sort((a, b) => {
-        if (a.priority !== b.priority) {
-          const priorityOrder = { high: 0, medium: 1, low: 2 }
-          return priorityOrder[a.priority] - priorityOrder[b.priority]
-        }
-        return (a.scheduled_time || '').localeCompare(b.scheduled_time || '')
-      })
-
-      setTasks(dedupedTasks)
+      const params = new URLSearchParams()
+      params.set('date', selectedDate)
+      if (selectedPropertyId && selectedPropertyId !== 'all') params.set('propertyId', selectedPropertyId)
+      const res = await fetch(`/api/schedule?${params.toString()}`)
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load schedule')
+      setPropertiesState(json.properties || [])
+      setTechnicians(json.technicians || [])
+      setTasks(json.tasks || [])
+      setError(null)
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [supabase, selectedDate, selectedPropertyId, session]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedDate, selectedPropertyId, session])
 
   useEffect(() => {
     if (!session?.user?.company_id) return
@@ -335,174 +79,24 @@ export default function SchedulePage({}: Props) {
 
   // Generate tasks from a unit's custom schedule
   const generateTasksFromCustomSchedule = (
-    customSchedule: any,
-    unit: any,
-    property: any,
-    date: string,
-    isOccupied: boolean
-  ): ScheduledTask[] => {
-    const tasks: ScheduledTask[] = []
-    const scheduleType = customSchedule.schedule_type as 'simple' | 'complex' | 'random_selection'
-    const cfg = customSchedule.schedule_config || {}
-
-    if (scheduleType === 'simple') {
-      const frequency = cfg.frequency as string
-      const time = cfg.time_preference || '09:00'
-      const dayPref = cfg.day_preference as string | undefined
-      const specificDays = cfg.specific_days as string[] | undefined
-      if (matchesFrequency(frequency, date, dayPref, specificDays, isOccupied)) {
-        const serviceType = (customSchedule.service_types?.[frequency]?.[0]) || 'full_service'
-        tasks.push({
-          id: `custom-${unit.id}-${date}-${time}`,
-          type: 'service',
-          unit_id: unit.id,
-          property_id: property.id,
-          property_name: property.name,
-          unit_name: unit.name,
-          unit_type: unit.unit_type,
-          service_type: serviceType,
-          scheduled_time: time,
-          status: 'pending',
-          priority: 'medium',
-        })
-      }
-    } else if (scheduleType === 'complex') {
-      const entries = (cfg.schedules || []) as Array<any>
-      for (const entry of entries) {
-        const frequency = entry.frequency as string
-        const time = entry.time || '09:00'
-        const days: string[] | undefined = entry.days
-        if (matchesFrequency(frequency, date, undefined, days, isOccupied)) {
-          const serviceType = (entry.service_types?.[0]) || 'full_service'
-          tasks.push({
-            id: `custom-${unit.id}-${date}-${time}-${serviceType}`,
-            type: 'service',
-            unit_id: unit.id,
-            property_id: property.id,
-            property_name: property.name,
-            unit_name: unit.name,
-            unit_type: unit.unit_type,
-            service_type: serviceType,
-            scheduled_time: time,
-            status: 'pending',
-            priority: 'medium',
-          })
-        }
-      }
-    }
-
-    // random_selection is handled via property rules, not per-unit
-    return tasks
-  }
+    _customSchedule: any,
+    _unit: any,
+    _property: any,
+    _date: string,
+    _isOccupied: boolean
+  ): ScheduledTask[] => { return [] }
 
   // Generate tasks based on property-level rules
   const generateTasksFromPropertyRules = (
-    rules: any[],
-    units: any[],
-    property: any,
-    date: string
-  ): ScheduledTask[] => {
-    const tasks: ScheduledTask[] = []
-    for (const rule of rules) {
-        if (rule.rule_type === 'random_selection') {
-        const cfg = rule.rule_config || {}
-        const frequency = cfg.frequency as string
-        if (!matchesFrequency(frequency, date)) continue
-
-        const selectionCount = Math.max(1, Math.min(50, Number(cfg.selection_count) || 1))
-        const time = cfg.time_preference || '09:00'
-        const allowedServiceTypes = (cfg.service_types?.[frequency]) || ['test_only']
-        const serviceType = allowedServiceTypes[0] || 'test_only'
-
-        // Filter units by targets (support top-level or nested in rule_config)
-        let candidateUnits = [...units]
-        const targetUnitTypes: string[] = (rule.target_unit_types && rule.target_unit_types.length)
-          ? rule.target_unit_types
-          : (cfg.target_unit_types || [])
-        const targetWaterTypes: string[] = (rule.target_water_types && rule.target_water_types.length)
-          ? rule.target_water_types
-          : (cfg.target_water_types || [])
-        if (targetUnitTypes.length) {
-          candidateUnits = candidateUnits.filter((u) => targetUnitTypes.includes(u.unit_type))
-        }
-        if (targetWaterTypes.length) {
-          candidateUnits = candidateUnits.filter((u) => targetWaterTypes.includes(u.water_type))
-        }
-        if (rule.target_units || cfg.target_units) {
-          try {
-            const tu = (rule.target_units ?? cfg.target_units)
-            const targetIds: string[] = Array.isArray(tu)
-              ? tu
-              : ((tu && tu.ids) as string[]) || []
-            if (targetIds.length) {
-              candidateUnits = candidateUnits.filter((u) => targetIds.includes(u.id))
-            }
-          } catch {}
-        }
-
-        if (candidateUnits.length === 0) continue
-
-        // Deterministic selection for a given date
-        const rng = seededRng(`${property.id}-${date}`)
-        const chosen = pickRandomDistinct(candidateUnits, selectionCount, rng)
-
-        for (const u of chosen) {
-          tasks.push({
-            id: `rule-${rule.id}-${u.id}-${date}-${time}`,
-            type: 'service',
-            unit_id: u.id,
-            property_id: property.id,
-            property_name: property.name,
-            unit_name: u.name,
-            unit_type: u.unit_type,
-            service_type: serviceType,
-            scheduled_time: time,
-            status: 'pending',
-            priority: 'high',
-          })
-        }
-      }
-    }
-    return tasks
-  }
+    _rules: any[], _units: any[], _property: any, _date: string
+  ): ScheduledTask[] => { return [] }
 
   // Equipment maintenance tasks
   const generateEquipmentTasks = async (
-    propertyId: string,
-    propertyName: string,
-    date: string
-  ): Promise<ScheduledTask[]> => {
-    const tasks: ScheduledTask[] = []
-    const { data: equipment } = await supabase
-      .from('equipment')
-      .select('id, name, unit_id, plant_room_id, maintenance_frequency, maintenance_times, measurement_config, maintenance_scheduled')
-      .eq('property_id', propertyId)
-      .eq('is_active', true)
-    for (const eq of equipment || []) {
-      if (!eq.measurement_config) continue
-      // Only generate tasks if explicitly flagged for scheduling and frequency set
-      if (!eq.maintenance_scheduled || !eq.maintenance_frequency) continue
-      if (!shouldCheckToday(eq.maintenance_frequency, date)) continue
-      const times: string[] = eq.maintenance_times || ['11:00']
-      for (const time of times) {
-        tasks.push({
-          id: `equip-${eq.id}-${date}-${time}`,
-          type: 'service',
-          unit_id: eq.unit_id || undefined,
-          equipment_id: eq.id,
-          property_id: propertyId,
-          property_name: propertyName,
-          unit_name: eq.name,
-          unit_type: 'equipment',
-          service_type: 'equipment_check',
-          scheduled_time: time,
-          status: 'pending',
-          priority: 'medium',
-        })
-      }
-    }
-    return tasks
-  }
+    _propertyId: string,
+    _propertyName: string,
+    _date: string
+  ): Promise<ScheduledTask[]> => { return [] }
 
   // Frequency matching with optional preferred day or explicit days list
   const matchesFrequency = (
@@ -582,15 +176,8 @@ export default function SchedulePage({}: Props) {
     const map: Record<string, number> = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 }
     return map[(dayName || '').toLowerCase()] === d.getDay()
   }
-  const unitHasServiceBetween = async (unitId: string, start: string, end: string) => {
-    const { data } = await supabase
-      .from('services')
-      .select('id')
-      .eq('unit_id', unitId)
-      .gte('service_date', start)
-      .lte('service_date', end)
-      .limit(1)
-    return !!(data && data.length)
+  const unitHasServiceBetween = async (_unitId: string, _start: string, _end: string) => {
+    return false
   }
 
   // Deterministic RNG from seed

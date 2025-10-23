@@ -37,7 +37,7 @@ export function useDashboardStats() {
 export function useServices(filters?: {
   propertyId?: string
   technicianId?: string
-  status?: string
+  status?: 'scheduled' | 'in_progress' | 'completed' | 'skipped'
   dateFrom?: string
   dateTo?: string
 }) {

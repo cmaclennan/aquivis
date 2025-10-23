@@ -5,14 +5,12 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { logger } from '@/lib/logger'
 
 export default function ReportFailurePage({ params }: { params: Promise<{ equipmentId: string }> }) {
   const { equipmentId } = use(params)
   const { data: session } = useSession()
-  const supabase = createClient()
   const router = useRouter()
 
   const [equipment, setEquipment] = useState<any>(null)
@@ -26,20 +24,16 @@ export default function ReportFailurePage({ params }: { params: Promise<{ equipm
   useEffect(() => {
     ;(async () => {
       try {
-        const { data, error: eqError } = await supabase
-          .from('equipment')
-          .select('id, name, properties(name), units(name, properties(name)), plant_rooms(name, properties(name))')
-          .eq('id', equipmentId)
-          .single()
-
-        if (eqError) throw eqError
-        setEquipment(data)
+        const res = await fetch(`/api/equipment/${equipmentId}`)
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Failed to load equipment')
+        setEquipment(json.equipment)
       } catch (e: any) {
         logger.error('Failed to load equipment', e)
         setError(e.message)
       }
     })()
-  }, [equipmentId, supabase])
+  }, [equipmentId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,19 +49,19 @@ export default function ReportFailurePage({ params }: { params: Promise<{ equipm
       setSaving(true)
       setError(null)
 
-      const { error: insertError } = await supabase
-        .from('equipment_failures')
-        .insert({
-          equipment_id: equipmentId,
+      const res = await fetch(`/api/equipment/${equipmentId}/failures`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           failure_type: failureType,
           severity,
           description: description.trim(),
           downtime_hours: downtimeHours ? parseFloat(downtimeHours) : null,
-          reported_by: session.user.id,
-          resolved: false
-        })
-
-      if (insertError) throw insertError
+          resolved: false,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to report failure')
 
       logger.success('Failure reported successfully')
       router.push(`/equipment/${equipmentId}`)

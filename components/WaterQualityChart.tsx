@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect, useCallback } from 'react'
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle } from 'lucide-react'
 
 interface WaterQualityChartProps {
@@ -20,38 +19,37 @@ export default function WaterQualityChart({ unitId, parameter, className = '' }:
   const [data, setData] = useState<DataPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  const supabase = useMemo(() => createClient(), [])
 
   const loadChartData = useCallback(async () => {
     try {
-      const { data: waterTests, error: waterTestsError } = await supabase
-        .from('water_tests')
-        .select(`
-          ${parameter},
-          all_parameters_ok,
-          test_time,
-          service:services(service_date)
-        `)
-        .not(parameter, 'is', null)
-        .order('test_time', { ascending: true })
-        .limit(10)
+      // Fetch recent services for the unit, then extract water tests
+      const res = await fetch(`/api/services?unitId=${unitId}&limit=50`)
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load water tests')
 
-      if (waterTestsError) throw waterTestsError
-
-      const chartData = (waterTests || []).map((test: { service: any; [key: string]: any }) => ({
-        date: Array.isArray(test.service) ? (test.service[0]?.service_date || '') : (test.service?.service_date || ''),
-        value: Number(test[parameter] ?? 0),
-        compliant: !!test.all_parameters_ok
-      }))
-
-      setData(chartData)
+      const services = Array.isArray(json.services) ? json.services : []
+      // Flatten water tests, attach service_date
+      const tests: Array<{ date: string; value: number; compliant: boolean }> = []
+      for (const s of services) {
+        const sts = Array.isArray(s.water_tests) ? s.water_tests : []
+        for (const wt of sts) {
+          const v = wt?.[parameter]
+          if (v !== null && v !== undefined) {
+            const d = (s.service_date || wt.test_time || '')
+            tests.push({ date: d, value: Number(v), compliant: !!wt.all_parameters_ok })
+          }
+        }
+      }
+      // Sort ascending by date/time and take last 10 points
+      tests.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      const last10 = tests.slice(-10)
+      setData(last10)
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [supabase, parameter])
+  }, [parameter, unitId])
 
   useEffect(() => {
     loadChartData()

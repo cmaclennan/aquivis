@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
@@ -79,7 +78,6 @@ export default function NewServiceStepByStepPage() {
   const { data: session } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = useMemo(() => createClient(), [])
   
   // Current step (1-6)
   const [currentStep, setCurrentStep] = useState(1)
@@ -115,42 +113,26 @@ export default function NewServiceStepByStepPage() {
     if (!session?.user?.company_id) return
 
     try {
-
-      // Load technicians
-      const { data: techsData, error: techsError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('company_id', session.user.company_id)
-        .eq('role', 'technician')
-        .order('first_name')
-
-      if (techsError) throw techsError
-      setTechnicians(techsData || [])
+      // Load technicians via server API
+      const res = await fetch('/api/technicians', { method: 'GET' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load technicians')
+      setTechnicians(json.technicians || [])
     } catch (err: any) {
       setError(err.message)
     }
-  }, [supabase, session])
+  }, [session])
 
   const loadUnit = useCallback(async (unitId: string) => {
     try {
-      const { data: unitData, error: unitError } = await supabase
-        .from('units')
-        .select(`
-          id,
-          name,
-          unit_type,
-          water_type,
-          property:properties(id, name)
-        `)
-        .eq('id', unitId)
-        .single()
-
-      if (unitError) throw unitError
-      setUnit(unitData ? { ...unitData, property: Array.isArray(unitData.property) ? unitData.property[0] : unitData.property } : null)
+      const res = await fetch(`/api/units/${unitId}`, { method: 'GET' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load unit')
+      setUnit(json.unit || null)
     } catch (err: any) {
       setError(err.message)
     }
-  }, [supabase])
+  }, [])
 
   const updateServiceData = (updates: Partial<ServiceData>) => {
     setServiceData(prev => ({ ...prev, ...updates }))
@@ -194,80 +176,82 @@ export default function NewServiceStepByStepPage() {
     setError(null)
 
     try {
-
-      // Create service
-      const { data: service, error: serviceError } = await supabase
-        .from('services')
-        .insert({
+      // Create service via API
+      const resService = await fetch('/api/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           unit_id: unit?.id,
           property_id: unit?.property.id,
           technician_id: serviceData.technicianId || null,
           service_date: serviceData.serviceDate,
           service_type: serviceData.serviceType,
           status: 'completed',
-          notes: serviceData.notes
-        })
-        .select()
-        .single()
-
-      if (serviceError) throw serviceError
+          notes: serviceData.notes,
+        }),
+      })
+      const serviceJson = await resService.json().catch(() => ({}))
+      if (!resService.ok || serviceJson?.error) throw new Error(serviceJson?.error || 'Failed to create service')
+      const service = serviceJson.service
 
       // Create water test if data provided
       const hasWaterTest = serviceData.ph || serviceData.chlorine || serviceData.bromine || 
                           serviceData.salt || serviceData.alkalinity || serviceData.calcium || serviceData.cyanuric
       
       if (hasWaterTest) {
-        const { error: waterTestError } = await supabase
-          .from('water_tests')
-          .insert({
-            service_id: service.id,
-            test_time: new Date().toISOString(),
+        const resWT = await fetch(`/api/services/${service.id}/water-tests`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             ph: serviceData.ph ? parseFloat(serviceData.ph) : null,
             chlorine: serviceData.chlorine ? parseFloat(serviceData.chlorine) : null,
             bromine: serviceData.bromine ? parseFloat(serviceData.bromine) : null,
             salt: serviceData.salt ? parseInt(serviceData.salt) : null,
             alkalinity: serviceData.alkalinity ? parseInt(serviceData.alkalinity) : null,
-            calcium: serviceData.calcium ? parseInt(serviceData.calcium) : null,
-            cyanuric: serviceData.cyanuric ? parseInt(serviceData.cyanuric) : null,
+            calcium_hardness: serviceData.calcium ? parseInt(serviceData.calcium) : null,
+            cyanuric_acid: serviceData.cyanuric ? parseInt(serviceData.cyanuric) : null,
             is_pump_running: serviceData.isPumpRunning,
             is_water_warm: serviceData.isWaterWarm,
             is_filter_cleaned: serviceData.isFilterCleaned,
-            all_parameters_ok: true, // Will be calculated by compliance logic
-            notes: serviceData.notes
-          })
-
-        if (waterTestError) throw waterTestError
+            all_parameters_ok: true,
+            notes: serviceData.notes,
+          }),
+        })
+        const wtJson = await resWT.json().catch(() => ({}))
+        if (!resWT.ok || wtJson?.error) throw new Error(wtJson?.error || 'Failed to save water test')
       }
 
       // Create chemical additions
       for (const chemical of serviceData.chemicalAdditions) {
         if (chemical.chemicalType && chemical.quantity) {
-          const { error: chemicalError } = await supabase
-            .from('chemical_additions')
-            .insert({
-              service_id: service.id,
-              chemical_type: chemical.chemicalType,
+          const resChem = await fetch(`/api/services/${service.id}/chemicals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ additions: [{
+              chemicalType: chemical.chemicalType,
               quantity: parseFloat(chemical.quantity),
-              unit_of_measure: chemical.unitOfMeasure
-            })
-
-          if (chemicalError) throw chemicalError
+              unitOfMeasure: chemical.unitOfMeasure,
+            }] }),
+          })
+          const chemJson = await resChem.json().catch(() => ({}))
+          if (!resChem.ok || chemJson?.error) throw new Error(chemJson?.error || 'Failed to save chemicals')
         }
       }
 
       // Create maintenance tasks
       for (const task of serviceData.maintenanceTasks) {
         if (task.taskType) {
-          const { error: taskError } = await supabase
-            .from('maintenance_tasks')
-            .insert({
-              service_id: service.id,
-              task_type: task.taskType,
+          const resTask = await fetch(`/api/services/${service.id}/maintenance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tasks: [{
+              taskType: task.taskType,
               completed: task.completed,
-              notes: task.notes
-            })
-
-          if (taskError) throw taskError
+              notes: task.notes,
+            }] }),
+          })
+          const taskJson = await resTask.json().catch(() => ({}))
+          if (!resTask.ok || taskJson?.error) throw new Error(taskJson?.error || 'Failed to save maintenance tasks')
         }
       }
 
@@ -278,7 +262,7 @@ export default function NewServiceStepByStepPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, router, serviceData.alkalinity, serviceData.bromine, serviceData.calcium, serviceData.chemicalAdditions, serviceData.chlorine, serviceData.cyanuric, serviceData.isFilterCleaned, serviceData.isPumpRunning, serviceData.isWaterWarm, serviceData.maintenanceTasks, serviceData.notes, serviceData.ph, serviceData.salt, serviceData.serviceDate, serviceData.serviceType, serviceData.technicianId, unit?.id, unit?.property.id])
+  }, [router, serviceData.alkalinity, serviceData.bromine, serviceData.calcium, serviceData.chemicalAdditions, serviceData.chlorine, serviceData.cyanuric, serviceData.isFilterCleaned, serviceData.isPumpRunning, serviceData.isWaterWarm, serviceData.maintenanceTasks, serviceData.notes, serviceData.ph, serviceData.salt, serviceData.serviceDate, serviceData.serviceType, serviceData.technicianId, unit?.id, unit?.property.id, session?.user?.company_id])
 
   useEffect(() => {
     loadData()

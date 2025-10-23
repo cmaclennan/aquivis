@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge, Building2 } from 'lucide-react'
 import Link from 'next/link'
@@ -19,7 +18,6 @@ export default function NewSharedFacilityPage({
 }) {
   const { data: session } = useSession()
   const router = useRouter()
-  const supabase = createClient()
   const [propertyId, setPropertyId] = useState<string>('')
   
   // Form state
@@ -41,22 +39,15 @@ export default function NewSharedFacilityPage({
   const [property, setProperty] = useState<any>(null)
 
   const loadProperty = useCallback(async (resolvedPropertyId: string) => {
-    if (!session?.user?.company_id) return
-
     try {
-      const { data: propertyData, error: propertyError } = await supabase
-        .from('properties')
-        .select('id, name, property_type')
-        .eq('id', resolvedPropertyId)
-        .eq('company_id', session.user.company_id)
-        .single()
-
-      if (propertyError) throw propertyError
-      setProperty(propertyData)
+      const res = await fetch(`/api/properties/${resolvedPropertyId}`)
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load property')
+      setProperty(json.property)
     } catch (err: any) {
       setError(err.message)
     }
-  }, [supabase, session])
+  }, [])
 
   useEffect(() => {
     // Resolve params Promise
@@ -68,17 +59,15 @@ export default function NewSharedFacilityPage({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!session?.user?.company_id) return
 
     setLoading(true)
     setError(null)
 
     try {
-
-      // Create shared facility
-      const { data: unit, error: unitError } = await supabase
-        .from('units')
-        .insert({
+      const res = await fetch('/api/units', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           property_id: propertyId,
           unit_type: unitType,
           name: name || null,
@@ -88,31 +77,25 @@ export default function NewSharedFacilityPage({
           depth_meters: depthMeters ? parseFloat(depthMeters) : null,
           service_frequency: serviceFrequency,
           last_service_warning_days: parseInt(lastServiceWarningDays),
-          billing_entity: 'property', // Always property for shared facilities
+          billing_entity: 'property',
           risk_category: riskCategory,
           notes: notes || null,
           is_active: true
-        })
-        .select()
-        .single()
-
-      if (unitError) throw unitError
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to create facility')
+      const unit = json.unit
 
       // Create custom schedule if one was configured
       if (serviceFrequency === 'custom' && customSchedule) {
-        const { error: scheduleError } = await supabase
-          .from('custom_schedules')
-          .insert({
-            unit_id: unit.id,
-            schedule_type: customSchedule.schedule_type,
-            schedule_config: customSchedule.schedule_config,
-            service_types: customSchedule.service_types,
-            name: customSchedule.name,
-            description: customSchedule.description,
-            is_active: true
-          })
-
-        if (scheduleError) throw scheduleError
+        const sres = await fetch(`/api/units/${unit.id}/custom-schedule`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(customSchedule),
+        })
+        const sjson = await sres.json().catch(() => ({}))
+        if (!sres.ok || sjson?.error) throw new Error(sjson?.error || 'Failed to save custom schedule')
       }
 
       // Redirect to property detail page

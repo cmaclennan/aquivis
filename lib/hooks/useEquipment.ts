@@ -1,7 +1,6 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
 
 export function useEquipment(filters?: {
   propertyId?: string
@@ -12,48 +11,16 @@ export function useEquipment(filters?: {
   return useQuery({
     queryKey: ['equipment', 'list', filters],
     queryFn: async () => {
-      const supabase = createClient()
-      
-      let query = supabase
-        .from('equipment')
-        .select(`
-          id,
-          name,
-          equipment_type,
-          manufacturer,
-          model,
-          serial_number,
-          status,
-          install_date,
-          properties(id, name),
-          units(id, name),
-          plant_rooms(id, name)
-        `)
-        .order('name', { ascending: true })
-      
-      if (filters?.propertyId) {
-        query = query.eq('property_id', filters.propertyId)
-      }
-      
-      if (filters?.unitId) {
-        query = query.eq('unit_id', filters.unitId)
-      }
-      
-      if (filters?.equipmentType) {
-        query = query.eq('equipment_type', filters.equipmentType)
-      }
-      
-      if (filters?.status) {
-        query = query.eq('status', filters.status)
-      }
-      
-      const { data, error } = await query
-      
-      if (error) {
-        throw new Error(error.message)
-      }
-      
-      return data
+      const params = new URLSearchParams()
+      if (filters?.propertyId) params.set('propertyId', filters.propertyId)
+      if (filters?.unitId) params.set('unitId', filters.unitId)
+      if (filters?.equipmentType) params.set('equipmentType', filters.equipmentType)
+      if (filters?.status) params.set('status', filters.status)
+
+      const res = await fetch(`/api/equipment${params.toString() ? `?${params.toString()}` : ''}`, { method: 'GET' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load equipment')
+      return json.equipment || []
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
   })
@@ -64,36 +31,10 @@ export function useEquipmentDetail(equipmentId: string | null) {
     queryKey: ['equipment', 'detail', equipmentId],
     queryFn: async () => {
       if (!equipmentId) return null
-      
-      const supabase = createClient()
-      
-      const { data, error } = await supabase
-        .from('equipment')
-        .select(`
-          id,
-          name,
-          equipment_type,
-          manufacturer,
-          model,
-          serial_number,
-          status,
-          install_date,
-          warranty_expiry,
-          notes,
-          created_at,
-          updated_at,
-          properties(id, name),
-          units(id, name),
-          plant_rooms(id, name)
-        `)
-        .eq('id', equipmentId)
-        .single()
-      
-      if (error) {
-        throw new Error(error.message)
-      }
-      
-      return data
+      const res = await fetch(`/api/equipment/${equipmentId}`, { method: 'GET' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load equipment')
+      return json.equipment || null
     },
     enabled: !!equipmentId,
     staleTime: 10 * 60 * 1000,
@@ -105,20 +46,10 @@ export function useEquipmentFailures(equipmentId: string | null) {
     queryKey: ['equipment', 'failures', equipmentId],
     queryFn: async () => {
       if (!equipmentId) return []
-      
-      const supabase = createClient()
-      
-      const { data, error } = await supabase
-        .from('equipment_failures')
-        .select('*')
-        .eq('equipment_id', equipmentId)
-        .order('failure_date', { ascending: false })
-      
-      if (error) {
-        throw new Error(error.message)
-      }
-      
-      return data
+      const res = await fetch(`/api/equipment/${equipmentId}/failures`, { method: 'GET' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load failures')
+      return json.failures || []
     },
     enabled: !!equipmentId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -130,17 +61,10 @@ export function useEquipmentFailureSummary(equipmentId: string | null) {
     queryKey: ['equipment', 'failure-summary', equipmentId],
     queryFn: async () => {
       if (!equipmentId) return null
-      
-      const supabase = createClient()
-      
-      const { data, error } = await supabase
-        .rpc('get_equipment_failure_summary', { p_equipment_id: equipmentId })
-      
-      if (error) {
-        throw new Error(error.message)
-      }
-      
-      return data
+      const res = await fetch(`/api/equipment/${equipmentId}/failures/summary`, { method: 'GET' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load failure summary')
+      return json.summary || null
     },
     enabled: !!equipmentId,
     staleTime: 5 * 60 * 1000,
@@ -152,20 +76,10 @@ export function useEquipmentMaintenance(equipmentId: string | null) {
     queryKey: ['equipment', 'maintenance', equipmentId],
     queryFn: async () => {
       if (!equipmentId) return []
-      
-      const supabase = createClient()
-      
-      const { data, error } = await supabase
-        .from('equipment_maintenance_logs')
-        .select('*')
-        .eq('equipment_id', equipmentId)
-        .order('maintenance_date', { ascending: false })
-      
-      if (error) {
-        throw new Error(error.message)
-      }
-      
-      return data
+      const res = await fetch(`/api/equipment/${equipmentId}/maintenance`, { method: 'GET' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load maintenance logs')
+      return json.logs || []
     },
     enabled: !!equipmentId,
     staleTime: 5 * 60 * 1000,
@@ -177,19 +91,15 @@ export function useCreateEquipmentFailure() {
   
   return useMutation({
     mutationFn: async (failureData: any) => {
-      const supabase = createClient()
-      
-      const { data, error } = await supabase
-        .from('equipment_failures')
-        .insert(failureData)
-        .select()
-        .single()
-      
-      if (error) {
-        throw new Error(error.message)
-      }
-      
-      return data
+      if (!failureData?.equipment_id) throw new Error('equipment_id required')
+      const res = await fetch(`/api/equipment/${failureData.equipment_id}/failures`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(failureData),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to create failure')
+      return json.failure
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['equipment', 'failures', data.equipment_id] })
@@ -204,20 +114,14 @@ export function useUpdateEquipmentFailure() {
   
   return useMutation({
     mutationFn: async ({ id, equipmentId, updates }: { id: string; equipmentId: string; updates: any }) => {
-      const supabase = createClient()
-      
-      const { data, error } = await supabase
-        .from('equipment_failures')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
-      
-      if (error) {
-        throw new Error(error.message)
-      }
-      
-      return data
+      const res = await fetch(`/api/equipment/${equipmentId}/failures/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to update failure')
+      return json.failure
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['equipment', 'failures', variables.equipmentId] })

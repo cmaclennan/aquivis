@@ -8,9 +8,9 @@ import { ArrowLeft, Calendar, MapPin, Droplets, FileText, CheckCircle2, AlertTri
 export default async function CustomerServiceDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
-  const { id: serviceId } = await params
+  const { id: serviceId } = params
 
   // Get user data from middleware headers
   const headersList = await headers()
@@ -69,22 +69,26 @@ export default async function CustomerServiceDetailPage({
         id,
         ph,
         chlorine,
-        total_chlorine,
-        free_chlorine,
+        bromine,
         alkalinity,
-        calcium_hardness,
-        cyanuric_acid,
-        phosphates,
+        calcium,
+        cyanuric,
         salt,
         temperature,
-        tds,
+        turbidity,
+        is_pump_running,
+        is_water_warm,
+        is_filter_cleaned,
+        all_parameters_ok,
+        test_time,
+        created_at,
         notes
       ),
-      service_chemicals(
+      chemical_additions(
         id,
-        chemical_name,
-        amount,
-        unit
+        chemical_type,
+        quantity,
+        unit_of_measure
       ),
       service_photos(
         id,
@@ -234,27 +238,27 @@ export default async function CustomerServiceDetailPage({
               </div>
             )}
 
-            {waterTest.calcium_hardness && (
+            {waterTest.calcium && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-xs text-gray-600 mb-1">Calcium Hardness</p>
-                <p className="text-lg font-semibold text-gray-900">{waterTest.calcium_hardness} ppm</p>
+                <p className="text-lg font-semibold text-gray-900">{waterTest.calcium} ppm</p>
                 <p className="text-xs text-gray-500">Target: 200-400 ppm</p>
               </div>
             )}
 
-            {waterTest.cyanuric_acid && (
+            {waterTest.cyanuric && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-xs text-gray-600 mb-1">Cyanuric Acid</p>
-                <p className="text-lg font-semibold text-gray-900">{waterTest.cyanuric_acid} ppm</p>
+                <p className="text-lg font-semibold text-gray-900">{waterTest.cyanuric} ppm</p>
                 <p className="text-xs text-gray-500">Target: 30-50 ppm</p>
               </div>
             )}
 
-            {waterTest.phosphates !== null && waterTest.phosphates !== undefined && (
+            {waterTest.turbidity !== null && waterTest.turbidity !== undefined && (
               <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-600 mb-1">Phosphates</p>
-                <p className="text-lg font-semibold text-gray-900">{waterTest.phosphates} ppb</p>
-                <p className="text-xs text-gray-500">Target: &lt;100 ppb</p>
+                <p className="text-xs text-gray-600 mb-1">Turbidity</p>
+                <p className="text-lg font-semibold text-gray-900">{waterTest.turbidity} NTU</p>
+                <p className="text-xs text-gray-500">Target: ≤1.0 NTU</p>
               </div>
             )}
 
@@ -283,15 +287,15 @@ export default async function CustomerServiceDetailPage({
       )}
 
       {/* Chemicals Added */}
-      {service.service_chemicals && service.service_chemicals.length > 0 && (
+      {service.chemical_additions && service.chemical_additions.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Chemicals Added</h2>
           <div className="space-y-2">
-            {service.service_chemicals.map((chemical: any) => (
+            {service.chemical_additions.map((chemical: any) => (
               <div key={chemical.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                <span className="text-sm font-medium text-gray-900">{chemical.chemical_name}</span>
+                <span className="text-sm font-medium text-gray-900">{chemical.chemical_type}</span>
                 <span className="text-sm text-gray-600">
-                  {chemical.amount} {chemical.unit}
+                  {chemical.quantity} {chemical.unit_of_measure}
                 </span>
               </div>
             ))}

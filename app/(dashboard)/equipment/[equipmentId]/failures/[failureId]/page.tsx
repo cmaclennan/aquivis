@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, CheckCircle2, DollarSign, Clock } from 'lucide-react'
 import { logger } from '@/lib/logger'
 
@@ -32,7 +31,6 @@ interface Failure {
 export default function FailureDetailPage({ params }: { params: Promise<{ equipmentId: string; failureId: string }> }) {
   const { equipmentId, failureId } = use(params)
   const { data: session } = useSession()
-  const supabase = createClient()
   const router = useRouter()
 
   const [failure, setFailure] = useState<Failure | null>(null)
@@ -46,23 +44,28 @@ export default function FailureDetailPage({ params }: { params: Promise<{ equipm
   useEffect(() => {
     ;(async () => {
       try {
-        const { data, error: failureError } = await supabase
-          .from('equipment_failures')
-          .select('*, equipment(name), profiles(full_name)')
-          .eq('id', failureId)
-          .single()
+        // Load equipment name for header
+        const eqRes = await fetch(`/api/equipment/${equipmentId}`)
+        const eqJson = await eqRes.json()
+        if (!eqRes.ok) throw new Error(eqJson.error || 'Failed to load equipment')
+        const equipmentName = eqJson.equipment?.name
 
-        if (failureError) throw failureError
-        setFailure(data)
-        setResolutionNotes(data.resolution_notes || '')
-        setPartsCost(data.parts_cost?.toString() || '')
-        setLaborCost(data.labor_cost?.toString() || '')
+        // Load failures for this equipment then pick by id
+        const fRes = await fetch(`/api/equipment/${equipmentId}/failures`)
+        const fJson = await fRes.json()
+        if (!fRes.ok) throw new Error(fJson.error || 'Failed to load failures')
+        const f = (fJson.failures || []).find((x: any) => x.id === failureId)
+        if (!f) throw new Error('Failure not found')
+        setFailure({ ...f, equipment: { name: equipmentName } } as any)
+        setResolutionNotes(f.resolution_notes || '')
+        setPartsCost(f.parts_cost?.toString() || '')
+        setLaborCost(f.labor_cost?.toString() || '')
       } catch (e: any) {
         logger.error('Failed to load failure details', e)
         setError(e.message)
       }
     })()
-  }, [failureId, supabase])
+  }, [equipmentId, failureId])
 
   const handleResolve = async () => {
     if (!session?.user?.id) return
@@ -71,19 +74,20 @@ export default function FailureDetailPage({ params }: { params: Promise<{ equipm
       setSaving(true)
       setError(null)
 
-      const { error: updateError } = await supabase
-        .from('equipment_failures')
-        .update({
+      const res = await fetch(`/api/equipment/${equipmentId}/failures/${failureId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           resolved: true,
           resolved_date: new Date().toISOString(),
           resolved_by: session.user.id,
           resolution_notes: resolutionNotes.trim() || null,
           parts_cost: partsCost ? parseFloat(partsCost) : 0,
-          labor_cost: laborCost ? parseFloat(laborCost) : 0
-        })
-        .eq('id', failureId)
-
-      if (updateError) throw updateError
+          labor_cost: laborCost ? parseFloat(laborCost) : 0,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to resolve failure')
 
       logger.success('Failure marked as resolved')
       router.push(`/equipment/${equipmentId}`)
@@ -100,28 +104,29 @@ export default function FailureDetailPage({ params }: { params: Promise<{ equipm
       setSaving(true)
       setError(null)
 
-      const { error: updateError } = await supabase
-        .from('equipment_failures')
-        .update({
+      const res = await fetch(`/api/equipment/${equipmentId}/failures/${failureId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           resolution_notes: resolutionNotes.trim() || null,
           parts_cost: partsCost ? parseFloat(partsCost) : 0,
-          labor_cost: laborCost ? parseFloat(laborCost) : 0
-        })
-        .eq('id', failureId)
-
-      if (updateError) throw updateError
+          labor_cost: laborCost ? parseFloat(laborCost) : 0,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to update failure')
 
       logger.success('Failure updated successfully')
       setEditing(false)
       
-      // Reload data
-      const { data } = await supabase
-        .from('equipment_failures')
-        .select('*, equipment(name), profiles(full_name)')
-        .eq('id', failureId)
-        .single()
-      
-      if (data) setFailure(data)
+      // Reload data quickly
+      const fRes = await fetch(`/api/equipment/${equipmentId}/failures`)
+      const fJson = await fRes.json()
+      if (fRes.ok) {
+        const equipmentName = (failure as any)?.equipment?.name
+        const f = (fJson.failures || []).find((x: any) => x.id === failureId)
+        if (f) setFailure({ ...f, equipment: { name: equipmentName } } as any)
+      }
     } catch (e: any) {
       logger.error('Failed to update failure', e)
       setError(e.message)

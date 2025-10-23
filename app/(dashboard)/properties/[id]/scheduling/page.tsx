@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { use } from 'react'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 type Rule = {
@@ -20,7 +19,6 @@ type Rule = {
 export default function PropertySchedulingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: propertyId } = use(params)
   const { data: session } = useSession()
-  const supabase = useMemo(() => createClient(), [])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [propertyName, setPropertyName] = useState('')
@@ -37,41 +35,40 @@ export default function PropertySchedulingPage({ params }: { params: Promise<{ i
   })
 
   const load = useCallback(async () => {
-    if (!session?.user?.company_id) return
-
     try {
       setLoading(true)
 
-      const [{ data: property }, { data: u }, { data: r }] = await Promise.all([
-        supabase.from('properties').select('name').eq('id', propertyId).single(),
-        supabase.from('units').select('id, name, unit_type, water_type').eq('property_id', propertyId).eq('is_active', true),
-        supabase
-          .from('property_scheduling_rules')
-          .select('id, rule_name, rule_config, is_active')
-          .eq('property_id', propertyId)
-          .eq('rule_type', 'random_selection')
-          .eq('is_active', true)
-      ])
+      const propRes = await fetch(`/api/properties/${propertyId}`)
+      const propJson = await propRes.json().catch(() => ({}))
+      if (!propRes.ok || propJson?.error) throw new Error(propJson?.error || 'Failed to load property')
+      setPropertyName(propJson.property?.name || '')
 
-      setPropertyName(property?.name || '')
-      setUnits(u || [])
-      const parsed = (r || []).map((row: any) => ({
-        id: row.id,
-        rule_name: row.rule_name,
-        selection_count: Number(row.rule_config?.selection_count || 2),
-        frequency: (row.rule_config?.frequency || 'daily'),
-        time_preference: row.rule_config?.time_preference || '09:00',
-        target_unit_types: row.rule_config?.target_unit_types || [],
-        target_water_types: row.rule_config?.target_water_types || [],
-        is_active: !!row.is_active,
-      }))
+      const unitsRes = await fetch(`/api/units?propertyId=${propertyId}`)
+      const unitsJson = await unitsRes.json().catch(() => ({}))
+      setUnits(unitsRes.ok && !unitsJson?.error ? (unitsJson.units || []) : [])
+
+      const rulesRes = await fetch(`/api/property-rules?propertyId=${propertyId}`)
+      const rulesJson = await rulesRes.json().catch(() => ({}))
+      if (!rulesRes.ok || rulesJson?.error) throw new Error(rulesJson?.error || 'Failed to load rules')
+      const parsed = (rulesJson.rules || [])
+        .filter((row: any) => row.rule_type === 'random_selection' && row.is_active)
+        .map((row: any) => ({
+          id: row.id,
+          rule_name: row.rule_name,
+          selection_count: Number(row.rule_config?.selection_count || 2),
+          frequency: (row.rule_config?.frequency || 'daily'),
+          time_preference: row.rule_config?.time_preference || '09:00',
+          target_unit_types: row.rule_config?.target_unit_types || [],
+          target_water_types: row.rule_config?.target_water_types || [],
+          is_active: !!row.is_active,
+        }))
       setRules(parsed)
     } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
-  }, [supabase, propertyId, session])
+  }, [propertyId])
 
   useEffect(() => {
     if (!session?.user?.company_id) return
@@ -94,8 +91,13 @@ export default function PropertySchedulingPage({ params }: { params: Promise<{ i
         },
         is_active: draft.is_active,
       }
-      const { error } = await supabase.from('property_scheduling_rules').insert(payload)
-      if (error) throw error
+      const res = await fetch('/api/property-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to save rule')
       setDraft({ rule_name: '', selection_count: 2, frequency: 'daily', time_preference: '09:00', target_unit_types: [], target_water_types: [], is_active: true })
       await load()
     } catch (e: any) {
@@ -107,8 +109,12 @@ export default function PropertySchedulingPage({ params }: { params: Promise<{ i
 
   const deactivateRule = async (id: string) => {
     try {
-      await supabase.from('property_scheduling_rules').update({ is_active: false }).eq('id', id)
-      await load()
+      const res = await fetch(`/api/property-rules/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: false }),
+      })
+      if (res.ok) await load()
     } catch {}
   }
 

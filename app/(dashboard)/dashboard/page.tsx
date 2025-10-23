@@ -55,31 +55,31 @@ export default async function DashboardPage() {
   try {
     // Call the optimized dashboard function (single query, massive performance boost)
     logger.debug('[DASHBOARD] Calling get_dashboard_summary RPC for user:', userId)
-    const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_summary', { p_user_id: userId })
+    const { data: rpcData, error: rpcError } = await (supabase as any).rpc('get_dashboard_summary', { p_user_id: userId })
 
     logger.debug('[DASHBOARD] RPC Response:', { rpcData, rpcError })
 
     if (rpcError) throw rpcError
 
-    if (rpcData && !rpcData.error) {
-      logger.debug('[DASHBOARD] RPC Success - stats:', rpcData.stats)
-      dashboardData = rpcData
+    if (rpcData && !(rpcData as any).error) {
+      logger.debug('[DASHBOARD] RPC Success - stats:', (rpcData as any).stats)
+      dashboardData = rpcData as any
       dashboardStats = {
         company_id: companyId,
         company_name: profile?.companies?.name || 'Company',
-        property_count: rpcData.stats?.active_properties ?? 0,
+        property_count: (rpcData as any).stats?.active_properties ?? 0,
         unit_count: 0, // Not in RPC function, will add if needed
-        today_services: rpcData.stats?.today_services ?? 0,
-        week_services: rpcData.stats?.week_services ?? 0,
-        total_services: rpcData.stats?.total_services ?? 0,
-        water_quality_issues: rpcData.stats?.water_quality_issues ?? 0,
+        today_services: (rpcData as any).stats?.today_services ?? 0,
+        week_services: (rpcData as any).stats?.week_services ?? 0,
+        total_services: (rpcData as any).stats?.total_services ?? 0,
+        water_quality_issues: (rpcData as any).stats?.water_quality_issues ?? 0,
         today_bookings: 0,
         recent_services: 0
       }
-      recentServices = rpcData.recent_services ?? []
+      recentServices = (rpcData as any).recent_services ?? []
     } else {
       // RPC function returned error, will use fallback
-      logger.warn('[DASHBOARD] RPC function error:', rpcData?.error)
+      logger.warn('[DASHBOARD] RPC function error:', (rpcData as any)?.error)
       logger.debug('Dashboard RPC function not available, using fallback view')
     }
   } catch (error) {
@@ -106,15 +106,10 @@ export default async function DashboardPage() {
         recent_services: 0
       }
 
-      // Get recent services using optimized view
-      const { data: servicesData } = await supabase
-        .from('services_summary')
-        .select('*')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      recentServices = servicesData ?? []
+      // Recent services via server API
+      const servicesRes = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/services?limit=5`, { cache: 'no-store' as any })
+      const servicesJson = await servicesRes.json().catch(() => ({ services: [] }))
+      recentServices = servicesJson?.services ?? []
     } catch (fallbackError) {
       logger.error('Dashboard fallback error', fallbackError)
       dashboardStats = {
@@ -300,10 +295,10 @@ export default async function DashboardPage() {
                       }`} />
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          {service.property_name} - {service.unit_name}
+                          {(service.property_name ?? service.units?.properties?.name ?? 'Property')} - {(service.unit_name ?? service.units?.name ?? 'Unit')}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {service.technician_name} • {new Date(service.service_date).toLocaleDateString()}
+                          {service.technician_name ?? ''} {service.technician_name ? '• ' : ''}{new Date(service.service_date).toLocaleDateString()}
                         </p>
               </div>
             </div>

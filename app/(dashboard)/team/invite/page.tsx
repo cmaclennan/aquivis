@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
@@ -10,7 +9,6 @@ import { ArrowLeft } from 'lucide-react'
 
 export default function InviteTeamMemberPage() {
   const { data: session } = useSession()
-  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const { toast } = useToast()
 
@@ -27,15 +25,12 @@ export default function InviteTeamMemberPage() {
 
     (async () => {
       try {
-        const { data: custs } = await supabase
-          .from('customers')
-          .select('id, name')
-          .eq('company_id', session.user.company_id)
-          .order('name')
-        setCustomers(custs || [])
+        const res = await fetch('/api/reports/lookups', { method: 'GET' })
+        const json = await res.json().catch(() => ({}))
+        if (res.ok && json?.customers) setCustomers(json.customers)
       } catch {}
     })()
-  }, [supabase, session])
+  }, [session])
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,16 +38,15 @@ export default function InviteTeamMemberPage() {
 
     setLoading(true)
     try {
-      const { data: invite, error } = await supabase.from('team_invitations').insert({
-        company_id: session.user.company_id,
-        email: email.trim(),
-        role,
-        customer_id: role === 'customer' ? (customerId || null) : null,
-        invited_by: user.id,
-      }).select('token').single()
-      if (error) throw error
+      const resCreate = await fetch('/api/team/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), role, customerId: role === 'customer' ? (customerId || null) : null }),
+      })
+      const createJson = await resCreate.json().catch(() => ({}))
+      if (!resCreate.ok || createJson?.error) throw new Error(createJson?.error || 'Failed to create invitation')
 
-      const inviteLink = `${window.location.origin}/invite/accept?token=${invite.token}`
+      const inviteLink = `${window.location.origin}/invite/accept?token=${createJson.token}`
       // Send email via API (server route uses Resend)
       const res = await fetch('/api/send-invite', {
         method: 'POST',

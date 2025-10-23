@@ -2,11 +2,9 @@
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const supabase = createClient()
   const router = useRouter()
   const [job, setJob] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -15,16 +13,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     ;(async () => {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('id', id)
-        .single()
-      if (error) setError(error.message)
-      setJob(data)
-      setLoading(false)
+      try {
+        const res = await fetch(`/api/jobs/${id}`)
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) {
+          setError(json?.error || 'Job not found')
+          setJob(null)
+        } else {
+          setJob(json.job)
+          setError(null)
+        }
+      } catch (e: any) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
     })()
-  }, [id, supabase])
+  }, [id])
 
   return (
     <div className="p-8">

@@ -1,10 +1,9 @@
 'use client'
 
 import { use } from 'react'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Plus, Save, Trash2, Settings } from 'lucide-react'
 import EquipmentEditor, { EquipmentEditorRow } from '@/components/equipment/EquipmentEditor'
 
@@ -20,7 +19,6 @@ interface EquipmentRow {
 
 export default function PlantRoomEquipmentPage({ params }: { params: Promise<{ id: string; plantRoomId: string }> }) {
   const { id: propertyId, plantRoomId } = use(params)
-  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
 
   const [plantRoomName, setPlantRoomName] = useState('')
@@ -36,23 +34,32 @@ export default function PlantRoomEquipmentPage({ params }: { params: Promise<{ i
     ;(async () => {
       try {
         setLoading(true)
-        const [{ data: pr }, { data: eq }] = await Promise.all([
-          supabase.from('plant_rooms').select('name').eq('id', plantRoomId).single(),
-          supabase
-            .from('equipment')
-            .select('id, name, category, maintenance_frequency, is_active, notes, measurement_config')
-            .eq('plant_room_id', plantRoomId)
-            .order('name')
+        const [propRes, eqRes] = await Promise.all([
+          fetch(`/api/properties/${propertyId}`),
+          fetch(`/api/equipment?plantRoomId=${plantRoomId}`),
         ])
-        setPlantRoomName(pr?.name || '')
-        setEquipment((eq || []) as EquipmentRow[])
+        const [propJson, eqJson] = await Promise.all([
+          propRes.json().catch(() => ({})),
+          eqRes.json().catch(() => ({})),
+        ])
+        if (propRes.ok && !propJson?.error) {
+          const pr = (propJson?.property?.plant_rooms || []).find((p: any) => p.id === plantRoomId)
+          setPlantRoomName(pr?.name || '')
+        } else {
+          setPlantRoomName('')
+        }
+        if (eqRes.ok && !eqJson?.error) {
+          setEquipment((eqJson.equipment || []) as EquipmentRow[])
+        } else {
+          setEquipment([])
+        }
       } catch (e: any) {
         setError(e.message)
       } finally {
         setLoading(false)
       }
     })()
-  }, [plantRoomId, supabase])
+  }, [propertyId, plantRoomId])
 
   const handleSave = async (data: Omit<EquipmentRow, 'id'> & { id?: string }) => {
     try {
@@ -67,19 +74,21 @@ export default function PlantRoomEquipmentPage({ params }: { params: Promise<{ i
           : ft === 'percent' ? 'percent'
           : (data.category === 'balance_tank' ? 'litres' : 'none')
 
-        const { error } = await supabase
-          .from('equipment')
-          .update({
+        const res = await fetch(`/api/equipment/${data.id}` , {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             name: data.name,
             category: data.category,
-            maintenance_frequency: data.maintenance_frequency,
+            maintenance_frequency: (data as any).maintenance_frequency,
             is_active: data.is_active,
             notes: data.notes,
             measurement_config: (data as any).measurement_config || null,
             measurement_type: mt,
-          })
-          .eq('id', data.id)
-        if (error) throw error
+          }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to update equipment')
         setEquipment(prev => prev.map(e => e.id === data.id ? { ...(e as any), ...data } as EquipmentRow : e))
       } else {
         const ft = (data as any).measurement_config?.field_type
@@ -89,22 +98,25 @@ export default function PlantRoomEquipmentPage({ params }: { params: Promise<{ i
           : ft === 'percent' ? 'percent'
           : (data.category === 'balance_tank' ? 'litres' : 'none')
 
-        const { data: inserted, error } = await supabase
-          .from('equipment')
-          .insert({
+        const res = await fetch('/api/equipment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            property_id: propertyId,
             plant_room_id: plantRoomId,
+            equipment_type: data.category || 'other',
             name: data.name,
             category: data.category,
-            maintenance_frequency: data.maintenance_frequency,
+            maintenance_frequency: (data as any).maintenance_frequency,
             is_active: data.is_active ?? true,
             notes: data.notes,
             measurement_config: (data as any).measurement_config || null,
             measurement_type: mt,
-          })
-          .select()
-          .single()
-        if (error) throw error
-        setEquipment(prev => [...prev, inserted as any])
+          }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to add equipment')
+        setEquipment(prev => [...prev, json.equipment as any])
       }
       setShowForm(false)
       setEditing(null)
@@ -119,8 +131,9 @@ export default function PlantRoomEquipmentPage({ params }: { params: Promise<{ i
     if (!confirm('Delete this equipment?')) return
     try {
       setSaving(true)
-      const { error } = await supabase.from('equipment').delete().eq('id', id)
-      if (error) throw error
+      const res = await fetch(`/api/equipment/${id}`, { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to delete equipment')
       setEquipment(prev => prev.filter(e => e.id !== id))
     } catch (e: any) {
       setError(e.message)
@@ -199,9 +212,17 @@ export default function PlantRoomEquipmentPage({ params }: { params: Promise<{ i
                   is_active: r.is_active,
                 }
               })
-              const { data, error } = await supabase.from('equipment').insert(payload).select()
-              if (error) throw error
-              setEquipment(prev => [...prev, ...((data || []) as any)])
+              const results = await Promise.all(payload.map(async (p) => {
+                const res = await fetch('/api/equipment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(p),
+                })
+                const json = await res.json().catch(() => ({}))
+                if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to add equipment')
+                return json.equipment
+              }))
+              setEquipment(prev => [...prev, ...results])
               setShowBatch(false)
             } catch (e: any) {
               setError(e.message)

@@ -23,21 +23,38 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  // Verify user has company_id (not super admin without company)
-  if (!companyId) {
-    redirect('/onboarding')
-  }
-
   // Get user profile and company for display
   const supabase = createAdminClient()
-  const { data: profile } = await supabase
+  const { data: profileData } = await supabase
     .from('profiles')
-    .select('*, companies(*)')
+    .select('id, first_name, last_name, role, company_id, companies(name)')
     .eq('id', userId)
     .single()
 
-  if (!profile?.company_id) {
+  const profile = profileData as {
+    id: string
+    first_name?: string | null
+    last_name?: string | null
+    role?: string | null
+    company_id?: string | null
+    companies?: { name?: string | null } | null
+  } | null
+
+  if (!profile) {
     redirect('/onboarding')
+  }
+
+  if (!profile.company_id) {
+    redirect('/onboarding')
+  }
+
+  const safeProfile = profile as {
+    id: string
+    first_name?: string | null
+    last_name?: string | null
+    role?: string | null
+    company_id?: string | null
+    companies?: { name?: string | null } | null
   }
 
   return (
@@ -58,7 +75,7 @@ export default async function DashboardLayout({
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="text-lg font-bold text-gray-900 truncate">Aquivis</h1>
-              <p className="text-xs text-gray-500 truncate">{profile.companies?.name}</p>
+              <p className="text-xs text-gray-500 truncate">{safeProfile.companies?.name}</p>
             </div>
           </div>
         </div>
@@ -121,7 +138,7 @@ export default async function DashboardLayout({
             <BarChart3 className="h-5 w-5" />
             <span>Reports</span>
           </Link>
-          {(profile?.role === 'owner' || profile?.role === 'super_admin') && (
+          {(safeProfile.role === 'owner' || safeProfile.role === 'super_admin') && (
             <Link
               href="/settings"
               className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
@@ -141,9 +158,9 @@ export default async function DashboardLayout({
                 className="min-w-0 flex-1 hover:bg-primary-100 rounded p-1 -m-1 transition-colors"
               >
                 <p className="font-medium text-primary-700 text-sm truncate">
-                  {profile?.first_name} {profile?.last_name}
+                  {safeProfile.first_name} {safeProfile.last_name}
                 </p>
-                <p className="text-xs text-primary-600 capitalize truncate">{profile?.role}</p>
+                <p className="text-xs text-primary-600 capitalize truncate">{safeProfile.role}</p>
               </Link>
               <Link
                 href="/logout"

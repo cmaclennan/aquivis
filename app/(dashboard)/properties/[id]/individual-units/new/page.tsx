@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge, Building2, User, CreditCard } from 'lucide-react'
 import Link from 'next/link'
@@ -25,7 +24,6 @@ export default function NewIndividualUnitPage({
 }) {
   const { data: session } = useSession()
   const router = useRouter()
-  const supabase = createClient()
   const [propertyId, setPropertyId] = useState<string>('')
   
   // Form state
@@ -48,34 +46,20 @@ export default function NewIndividualUnitPage({
   const [customers, setCustomers] = useState<Customer[]>([])
 
   const loadData = useCallback(async (resolvedPropertyId: string) => {
-    if (!session?.user?.company_id) return
-
     try {
+      const propRes = await fetch(`/api/properties/${resolvedPropertyId}`)
+      const propJson = await propRes.json().catch(() => ({}))
+      if (!propRes.ok || propJson?.error) throw new Error(propJson?.error || 'Failed to load property')
+      setProperty(propJson.property)
 
-      // Load property
-      const { data: propertyData, error: propertyError } = await supabase
-        .from('properties')
-        .select('id, name, property_type')
-        .eq('id', resolvedPropertyId)
-        .eq('company_id', session.user.company_id)
-        .single()
-
-      if (propertyError) throw propertyError
-      setProperty(propertyData)
-
-      // Load customers
-      const { data: customersData, error: customersError } = await supabase
-        .from('customers')
-        .select('id, name, customer_type')
-        .eq('company_id', session.user.company_id)
-        .order('name')
-
-      if (customersError) throw customersError
-      setCustomers(customersData || [])
+      const custRes = await fetch('/api/customers')
+      const custJson = await custRes.json().catch(() => ({}))
+      if (!custRes.ok || custJson?.error) throw new Error(custJson?.error || 'Failed to load customers')
+      setCustomers(custJson.customers || [])
     } catch (err: any) {
       setError(err.message)
     }
-  }, [supabase, session])
+  }, [])
 
   useEffect(() => {
     // Resolve params Promise
@@ -87,17 +71,15 @@ export default function NewIndividualUnitPage({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!session?.user?.company_id) return
 
     setLoading(true)
     setError(null)
 
     try {
-
-      // Create individual unit
-      const { data: unit, error: unitError } = await supabase
-        .from('units')
-        .insert({
+      const res = await fetch('/api/units', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           property_id: propertyId,
           unit_type: unitType,
           name: name || null,
@@ -112,11 +94,10 @@ export default function NewIndividualUnitPage({
           risk_category: riskCategory,
           notes: notes || null,
           is_active: true
-        })
-        .select()
-        .single()
-
-      if (unitError) throw unitError
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to create unit')
 
       // Redirect to property detail page
       router.push(`/properties/${propertyId}`)

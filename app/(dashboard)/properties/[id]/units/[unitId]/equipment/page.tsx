@@ -3,11 +3,9 @@
 import { use } from 'react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 export default function UnitEquipmentPage({ params }: { params: Promise<{ id: string; unitId: string }> }) {
   const { id: propertyId, unitId } = use(params)
-  const supabase = createClient()
   const [equipment, setEquipment] = useState<any[]>([])
   const [unitName, setUnitName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -17,19 +15,32 @@ export default function UnitEquipmentPage({ params }: { params: Promise<{ id: st
     ;(async () => {
       try {
         setLoading(true)
-        const [{ data: unit }, { data: eq }] = await Promise.all([
-          supabase.from('units').select('name').eq('id', unitId).single(),
-          supabase.from('equipment').select('id, name, category, maintenance_frequency, is_active').eq('unit_id', unitId).order('name')
+        const [propRes, eqRes] = await Promise.all([
+          fetch(`/api/properties/${propertyId}`),
+          fetch(`/api/equipment?unitId=${unitId}`),
         ])
-        setUnitName(unit?.name || '')
-        setEquipment(eq || [])
+        const [propJson, eqJson] = await Promise.all([
+          propRes.json().catch(() => ({})),
+          eqRes.json().catch(() => ({})),
+        ])
+        if (propRes.ok && !propJson?.error) {
+          const unit = (propJson?.property?.units || []).find((u: any) => u.id === unitId)
+          setUnitName(unit?.name || '')
+        } else {
+          setUnitName('')
+        }
+        if (eqRes.ok && !eqJson?.error) {
+          setEquipment(eqJson.equipment || [])
+        } else {
+          setEquipment([])
+        }
       } catch (e: any) {
         setError(e.message)
       } finally {
         setLoading(false)
       }
     })()
-  }, [unitId, supabase])
+  }, [propertyId, unitId])
 
   return (
     <div className="p-8">

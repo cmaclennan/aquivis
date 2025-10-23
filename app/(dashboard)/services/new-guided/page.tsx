@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ArrowRight, CheckCircle, Clock, Droplets } from 'lucide-react'
 import Link from 'next/link'
@@ -87,7 +86,7 @@ export default function NewGuidedServicePage() {
   const { data: session } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = useMemo(() => createClient(), [])
+  // Using server APIs instead of browser Supabase
 
   // Current step (1-6)
   const [currentStep, setCurrentStep] = useState(1)
@@ -115,63 +114,33 @@ export default function NewGuidedServicePage() {
     if (!session?.user?.company_id) return
 
     try {
-
       // Load technicians
-      const { data: techsData, error: techsError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('company_id', session.user.company_id)
-        .eq('role', 'technician')
-        .order('first_name')
-
-      if (techsError) throw techsError
-      setTechnicians(techsData || [])
+      const techRes = await fetch('/api/technicians', { method: 'GET' })
+      const techJson = await techRes.json().catch(() => ({}))
+      if (!techRes.ok || techJson?.error) throw new Error(techJson?.error || 'Failed to load technicians')
+      setTechnicians(techJson.technicians || [])
 
       // Load units
-      const { data: unitsData, error: unitsError } = await supabase
-        .from('units')
-        .select(`
-          id,
-          name,
-          unit_type,
-          water_type,
-          property:properties(id, name)
-        `)
-        .eq('property.company_id', session.user.company_id)
-        .order('name')
-
-      if (unitsError) throw unitsError
-      // Normalize join arrays to single objects where necessary
-      const normalized: Unit[] = (unitsData || []).map((u: any) => ({
-        ...u,
-        property: Array.isArray(u.property) ? u.property[0] : u.property,
-      }))
-      setUnits(normalized)
+      const unitsRes = await fetch('/api/units', { method: 'GET' })
+      const unitsJson = await unitsRes.json().catch(() => ({}))
+      if (!unitsRes.ok || unitsJson?.error) throw new Error(unitsJson?.error || 'Failed to load units')
+      setUnits(unitsJson.units || [])
     } catch (err: any) {
       setError(err.message)
     }
-  }, [supabase, session])
+  }, [session])
 
   const loadUnit = useCallback(async (unitId: string) => {
     try {
-      const { data: unitData, error: unitError } = await supabase
-        .from('units')
-        .select(`
-          id,
-          name,
-          unit_type,
-          water_type,
-          property:properties(id, name)
-        `)
-        .eq('id', unitId)
-        .single()
-
-      if (unitError) throw unitError
-      setUnit(unitData ? { ...unitData, property: Array.isArray(unitData.property) ? unitData.property[0] : unitData.property } : null)
+      const res = await fetch(`/api/units/${unitId}`, { method: 'GET' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load unit')
+      // json.unit should include property object
+      setUnit(json.unit || null)
     } catch (err: any) {
       setError(err.message)
     }
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -234,23 +203,23 @@ export default function NewGuidedServicePage() {
     if (!session?.user?.company_id) return
 
     try {
-
-      // Create service
-      const { data: service, error: serviceError } = await supabase
-        .from('services')
-        .insert({
+      // Create service via API
+      const resService = await fetch('/api/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           unit_id: unit?.id,
           property_id: unit?.property.id,
           technician_id: serviceData.technicianId || null,
           service_date: serviceData.serviceDate,
           service_type: serviceData.serviceType,
           status: 'completed',
-          notes: serviceData.notes
-        })
-        .select()
-        .single()
-
-      if (serviceError) throw serviceError
+          notes: serviceData.notes,
+        }),
+      })
+      const serviceJson = await resService.json().catch(() => ({}))
+      if (!resService.ok || serviceJson?.error) throw new Error(serviceJson?.error || 'Failed to create service')
+      const service = serviceJson.service
 
       // Create water test if data provided
       const hasWaterTest = Object.values(serviceData.waterTestData).some((value: any) => {
@@ -259,31 +228,34 @@ export default function NewGuidedServicePage() {
       })
       
       if (hasWaterTest) {
-        const { error: waterTestError } = await supabase
-          .from('water_tests')
-          .insert({
-            service_id: service.id,
-            test_time: new Date().toISOString(),
+        // Map simplified keys if needed; send as-is for server to persist
+        const resWT = await fetch(`/api/services/${service.id}/water-tests`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             ...serviceData.waterTestData,
-            all_parameters_ok: true // Will be calculated by compliance logic
-          })
-
-        if (waterTestError) throw waterTestError
+            all_parameters_ok: true,
+          }),
+        })
+        const wtJson = await resWT.json().catch(() => ({}))
+        if (!resWT.ok || wtJson?.error) throw new Error(wtJson?.error || 'Failed to save water test')
       }
 
       // Create chemical additions (existing table)
       for (const chemical of serviceData.chemicalAdditions) {
         if (chemical.chemicalType && chemical.quantity) {
-          const { error: chemicalError } = await supabase
-            .from('chemical_additions')
-            .insert({
-              service_id: service.id,
-              chemical_type: chemical.chemicalType,
+          const resChem = await fetch(`/api/services/${service.id}/chemicals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ additions: [{
+              chemicalType: chemical.chemicalType,
               quantity: chemical.quantity,
-              unit_of_measure: chemical.unitOfMeasure
-            })
-
-          if (chemicalError) throw chemicalError
+              unitOfMeasure: chemical.unitOfMeasure,
+              cost: undefined,
+            }] }),
+          })
+          const chemJson = await resChem.json().catch(() => ({}))
+          if (!resChem.ok || chemJson?.error) throw new Error(chemJson?.error || 'Failed to save chemicals')
         }
       }
 
@@ -297,7 +269,7 @@ export default function NewGuidedServicePage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, router, serviceData.chemicalAdditions, serviceData.notes, serviceData.serviceDate, serviceData.serviceType, serviceData.technicianId, serviceData.waterTestData, unit?.id, unit?.property.id])
+  }, [router, serviceData.chemicalAdditions, serviceData.notes, serviceData.serviceDate, serviceData.serviceType, serviceData.technicianId, serviceData.waterTestData, unit?.id, unit?.property.id, session?.user?.company_id])
 
   useEffect(() => {
     loadData()

@@ -2,25 +2,27 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 export default function JobsPage() {
-  const supabase = createClient()
   const [jobs, setJobs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     ;(async () => {
       setLoading(true)
-      const { data } = await supabase
-        .from('jobs')
-        .select('id, title, job_type, status, scheduled_at, property_id, unit_id, plant_room_id')
-        .order('scheduled_at', { ascending: true })
-        .limit(200)
-      setJobs(data || [])
-      setLoading(false)
+      try {
+        const res = await fetch('/api/jobs')
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) {
+          setJobs([])
+        } else {
+          setJobs(json.jobs || [])
+        }
+      } finally {
+        setLoading(false)
+      }
     })()
-  }, [supabase])
+  }, [])
 
   return (
     <div className="p-8">

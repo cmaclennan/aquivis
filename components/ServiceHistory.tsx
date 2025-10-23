@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Calendar, User, Droplets, CheckCircle, AlertTriangle, Clock, ExternalLink } from 'lucide-react'
 
@@ -31,29 +30,20 @@ export default function ServiceHistory({ unitId, className = '' }: ServiceHistor
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  const supabase = useMemo(() => createClient(), [])
 
   const loadServiceHistory = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('services')
-        .select(`
-          id,
-          service_date,
-          service_type,
-          status,
-          technician:profiles!services_technician_id_fkey(first_name, last_name),
-          water_tests(ph, chlorine, bromine, all_parameters_ok)
-        `)
-        .eq('unit_id', unitId)
-        .order('service_date', { ascending: false })
-        .limit(20)
-
-      if (error) throw error
-      const normalized: Service[] = (data || []).map((s: any) => ({
-        ...s,
-        technician: Array.isArray(s.technician) ? s.technician[0] : s.technician,
+      const res = await fetch(`/api/services?unitId=${unitId}&limit=20`)
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load services')
+      const list = Array.isArray(json.services) ? json.services : []
+      const normalized: Service[] = list.map((s: any) => ({
+        id: s.id,
+        service_date: s.service_date,
+        service_type: s.service_type,
+        status: s.status,
+        technician: Array.isArray(s.technician) ? s.technician[0] : s.technician || null,
+        water_tests: Array.isArray(s.water_tests) ? s.water_tests : [],
       }))
       setServices(normalized)
     } catch (err: any) {
@@ -61,7 +51,7 @@ export default function ServiceHistory({ unitId, className = '' }: ServiceHistor
     } finally {
       setLoading(false)
     }
-  }, [supabase, unitId])
+  }, [unitId])
 
   useEffect(() => {
     loadServiceHistory()

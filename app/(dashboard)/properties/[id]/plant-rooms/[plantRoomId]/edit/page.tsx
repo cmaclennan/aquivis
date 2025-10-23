@@ -1,13 +1,11 @@
 'use client'
 
 import { use } from 'react'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 export default function EditPlantRoomPage({ params }: { params: Promise<{ id: string; plantRoomId: string }> }) {
   const { id: propertyId, plantRoomId } = use(params)
-  const supabase = useMemo(() => createClient(), [])
   const [name, setName] = useState('')
   const [checkFrequency, setCheckFrequency] = useState('daily')
   const [checkTimes, setCheckTimes] = useState<string[]>(['09:00'])
@@ -20,18 +18,16 @@ export default function EditPlantRoomPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     ;(async () => {
       try {
-        const { data, error: err } = await supabase
-          .from('plant_rooms')
-          .select('name, check_frequency, check_times, check_days, notes')
-          .eq('id', plantRoomId)
-          .single()
-        if (err) throw err
-        setName(data?.name || '')
-        setCheckFrequency(data?.check_frequency || 'daily')
-        setCheckTimes(data?.check_times || ['09:00'])
-        setNotes(data?.notes || '')
+        const res = await fetch(`/api/plant-rooms/${plantRoomId}`)
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load plant room')
+        const data = json.plant_room || {}
+        setName(data.name || '')
+        setCheckFrequency(data.check_frequency || 'daily')
+        setCheckTimes(data.check_times || ['09:00'])
+        setNotes(data.notes || '')
         // Normalize check_days to day-name strings in UI state
-        const days = data?.check_days || []
+        const days = data.check_days || []
         if (Array.isArray(days) && days.length) {
           const intToDay: Record<number, string> = {
             0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday', 6: 'saturday',
@@ -47,7 +43,7 @@ export default function EditPlantRoomPage({ params }: { params: Promise<{ id: st
         setLoading(false)
       }
     })()
-  }, [plantRoomId, supabase])
+  }, [plantRoomId])
 
   const updateTime = (i: number, v: string) => setCheckTimes((t) => t.map((val, idx) => (idx === i ? v : val)))
   const addTime = () => setCheckTimes((t) => [...t, '15:00'])
@@ -70,11 +66,19 @@ export default function EditPlantRoomPage({ params }: { params: Promise<{ id: st
       const checkDaysToSave = checkFrequency === 'specific_days'
         ? (checkDays.length ? checkDays.map(d => dayNameToInt[d] ?? null).filter((v) => v !== null) : null)
         : null
-      const { error: err } = await supabase
-        .from('plant_rooms')
-        .update({ name, check_frequency: checkFrequency, check_times: checkTimes, check_days: checkDaysToSave, notes: notes || null })
-        .eq('id', plantRoomId)
-      if (err) throw err
+      const res = await fetch(`/api/plant-rooms/${plantRoomId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          check_frequency: checkFrequency,
+          check_times: checkTimes,
+          check_days: checkDaysToSave,
+          notes: notes || null,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to save plant room')
       window.location.href = `/properties/${propertyId}/plant-rooms`
     } catch (e: any) {
       setError(e.message)

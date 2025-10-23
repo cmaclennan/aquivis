@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Image from 'next/image'
@@ -17,7 +16,6 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const { data: session, status } = useSession()
-  const supabase = createClient()
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -36,33 +34,15 @@ export default function OnboardingPage() {
         throw new Error('Not authenticated')
       }
 
-      const userId = session.user.id
-
-      // Create company
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .insert({
-          name: companyName,
-          business_type: businessType,
-          phone: phone,
-          timezone: 'Australia/Brisbane',
-          unit_system: 'metric',
-          date_format: 'DD/MM/YYYY',
-          currency: 'AUD',
-          compliance_jurisdiction: 'QLD',
-        })
-        .select()
-        .single()
-
-      if (companyError) throw companyError
-
-      // Update user profile with company_id
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ company_id: company.id })
-        .eq('id', userId)
-
-      if (profileError) throw profileError
+      const res = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: companyName, businessType, phone }),
+      })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Failed to create company' }))
+        throw new Error(error)
+      }
 
       // Success - redirect to dashboard
       router.push('/dashboard')

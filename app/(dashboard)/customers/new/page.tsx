@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Mail, Phone, MapPin, CreditCard } from 'lucide-react'
 import Link from 'next/link'
@@ -13,7 +12,6 @@ import { customerSchema, type CustomerFormData } from '@/lib/validations/schemas
 export default function NewCustomerPage() {
   const router = useRouter()
   const { data: session } = useSession()
-  const supabase = createClient()
 
   // Form with validation
   const form = useForm<CustomerFormData>({
@@ -41,15 +39,10 @@ export default function NewCustomerPage() {
     setError(null)
 
     try {
-      if (!session?.user?.company_id) {
-        throw new Error('Not authenticated or no company found')
-      }
-
-      // Data is already validated by Zod resolver
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .insert({
-          company_id: session.user.company_id,
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: data.name.trim(),
           customer_type: data.customer_type,
           email: data.email?.trim() || null,
@@ -61,14 +54,11 @@ export default function NewCustomerPage() {
           billing_email: data.billing_email?.trim() || null,
           payment_terms: data.payment_terms || 'Net 30',
           notes: data.notes?.trim() || null,
-        })
-        .select()
-        .single()
-
-      if (customerError) throw customerError
-
-      // Success - redirect to customer detail page
-      router.push(`/customers/${customer.id}`)
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to create customer')
+      router.push(`/customers/${json.customer.id}`)
     } catch (err: any) {
       setError(err.message || 'Failed to create customer')
     } finally {

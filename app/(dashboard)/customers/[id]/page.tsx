@@ -7,10 +7,10 @@ import { ArrowLeft, Users, MapPin, Phone, Mail, CreditCard, Building2, Droplets 
 export default async function CustomerDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
-  // Await params for Next.js 15
-  const { id: customerId } = await params
+  // Params
+  const { id: customerId } = params
 
   // Get user data from middleware headers
   const headersList = await headers()
@@ -27,9 +27,7 @@ export default async function CustomerDetailPage({
 
   const supabase = createAdminClient()
 
-  if (!profile?.company_id) {
-    redirect('/onboarding')
-  }
+  // companyId is guaranteed above; profile fetch unnecessary here
 
   // Get customer with related data
   const { data: customer, error } = await supabase

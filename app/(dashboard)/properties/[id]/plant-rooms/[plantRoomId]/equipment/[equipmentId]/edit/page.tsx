@@ -3,11 +3,9 @@
 import { use } from 'react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 export default function EditPlantRoomEquipmentPage({ params }: { params: Promise<{ id: string; plantRoomId: string; equipmentId: string }> }) {
   const { id: propertyId, plantRoomId, equipmentId } = use(params)
-  const supabase = createClient()
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [maintenanceFrequency, setMaintenanceFrequency] = useState('weekly')
@@ -21,24 +19,22 @@ export default function EditPlantRoomEquipmentPage({ params }: { params: Promise
     ;(async () => {
       try {
         setLoading(true)
-        const { data, error: err } = await supabase
-          .from('equipment')
-          .select('name, category, maintenance_frequency, maintenance_times, notes')
-          .eq('id', equipmentId)
-          .single()
-        if (err) throw err
-        setName(data?.name || '')
-        setCategory(data?.category || '')
-        setMaintenanceFrequency(data?.maintenance_frequency || 'weekly')
-        setMaintenanceTimes(data?.maintenance_times || ['09:00'])
-        setNotes(data?.notes || '')
+        const res = await fetch(`/api/equipment/${equipmentId}`)
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load equipment')
+        const eq = json.equipment || {}
+        setName(eq.name || '')
+        setCategory(eq.category || '')
+        setMaintenanceFrequency(eq.maintenance_frequency || 'weekly')
+        setMaintenanceTimes(eq.maintenance_times || ['09:00'])
+        setNotes(eq.notes || '')
       } catch (e: any) {
         setError(e.message)
       } finally {
         setLoading(false)
       }
     })()
-  }, [equipmentId, supabase])
+  }, [equipmentId])
 
   const addTime = () => setMaintenanceTimes((t) => [...t, '15:00'])
   const removeTime = (i: number) => setMaintenanceTimes((t) => t.filter((_, idx) => idx !== i))
@@ -48,11 +44,19 @@ export default function EditPlantRoomEquipmentPage({ params }: { params: Promise
     e.preventDefault()
     try {
       setSaving(true)
-      const { error: err } = await supabase
-        .from('equipment')
-        .update({ name, category: category || null, maintenance_frequency: maintenanceFrequency, maintenance_times: maintenanceTimes, notes: notes || null })
-        .eq('id', equipmentId)
-      if (err) throw err
+      const res = await fetch(`/api/equipment/${equipmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          category: category || null,
+          maintenance_frequency: maintenanceFrequency,
+          maintenance_times: maintenanceTimes,
+          notes: notes || null,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to save equipment')
       window.location.href = `/properties/${propertyId}/plant-rooms/${plantRoomId}/equipment`
     } catch (e: any) {
       setError(e.message)

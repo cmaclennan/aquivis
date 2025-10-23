@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Edit, Trash2 } from 'lucide-react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { reportError } from '@/lib/sentry'
 
 interface ServicesClientProps {
@@ -14,7 +13,6 @@ interface ServicesClientProps {
 export default function ServicesClient({ serviceId }: ServicesClientProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   const handleDeleteService = async () => {
     if (!confirm('Are you sure you want to delete this service? This action cannot be undone.')) {
@@ -23,12 +21,9 @@ export default function ServicesClient({ serviceId }: ServicesClientProps) {
 
     setIsDeleting(true)
     try {
-      const { error } = await supabase
-        .from('services')
-        .delete()
-        .eq('id', serviceId)
-
-      if (error) throw error
+      const res = await fetch(`/api/services/${serviceId}`, { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to delete')
 
       // Refresh the page to show updated list
       router.refresh()

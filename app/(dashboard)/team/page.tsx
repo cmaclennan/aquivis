@@ -99,7 +99,7 @@ export default async function TeamPage() {
             <div>
               <p className="text-sm text-gray-600">Managers</p>
               <p className="mt-2 text-3xl font-bold text-gray-900">
-                {teamMembers?.filter(m => m.role === 'manager').length || 0}
+                {teamMembers?.filter(m => String(m.role) === 'manager').length || 0}
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
@@ -127,7 +127,7 @@ export default async function TeamPage() {
             <div>
               <p className="text-sm text-gray-600">Customers</p>
               <p className="mt-2 text-3xl font-bold text-gray-900">
-                {teamMembers?.filter(m => m.role === 'customer').length || 0}
+                {teamMembers?.filter(m => String(m.role) === 'customer').length || 0}
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
@@ -188,9 +188,9 @@ export default async function TeamPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      member.role === 'owner' 
+                      String(member.role) === 'owner' 
                         ? 'bg-purple-100 text-purple-800'
-                        : member.role === 'manager'
+                        : String(member.role) === 'manager'
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-green-100 text-green-800'
                     }`}>

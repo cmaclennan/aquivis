@@ -2,10 +2,9 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 
 import { Suspense } from 'react'
 
@@ -13,7 +12,6 @@ function AcceptInviteInner() {
   const params = useSearchParams()
   const token = params.get('token') || ''
   const { data: session } = useSession()
-  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const [status, setStatus] = useState<'checking' | 'login' | 'accepting' | 'done' | 'error'>('checking')
   const [message, setMessage] = useState('')
@@ -32,39 +30,20 @@ function AcceptInviteInner() {
           return
         }
         setStatus('accepting')
-        const { data: invite, error } = await supabase
-          .from('team_invitations')
-          .select('id, company_id, email, role, customer_id, is_revoked, accepted_at')
-          .eq('token', token)
-          .single()
-        if (error || !invite) throw new Error('Invite not found')
-        if (invite.is_revoked) throw new Error('Invite has been revoked')
-        if (invite.accepted_at) {
+        const res = await fetch('/api/invite/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to accept invite')
+
+        if (json?.alreadyAccepted) {
           setStatus('done')
           setMessage('Invite already accepted.')
           router.push('/team')
           return
         }
-
-        // Attach user to company and mark invite accepted
-        const { error: upErr } = await supabase
-          .from('profiles')
-          .update({ company_id: invite.company_id, role: invite.role })
-          .eq('id', session.user.id)
-        if (upErr) throw upErr
-
-        // Link user to customer if provided
-        if (invite.customer_id && session.user.id) {
-          await supabase
-            .from('customer_user_links')
-            .insert({ customer_id: invite.customer_id, user_id: session.user.id })
-        }
-
-        const { error: accErr } = await supabase
-          .from('team_invitations')
-          .update({ accepted_at: new Date().toISOString(), accepted_by: session.user.id })
-          .eq('id', invite.id)
-        if (accErr) throw accErr
 
         setStatus('done')
         setMessage('Invite accepted. Redirecting…')
@@ -74,7 +53,7 @@ function AcceptInviteInner() {
         setMessage(e.message || 'Failed to accept invite')
       }
     })()
-  }, [token, supabase, router, session])
+  }, [token, router, session])
 
   return (
     <div className="min-h-screen flex items-center justify-center">

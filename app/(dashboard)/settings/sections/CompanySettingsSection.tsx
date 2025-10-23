@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Building2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -10,7 +9,6 @@ interface CompanySettingsSectionProps {
 }
 
 export default function CompanySettingsSection({ company }: CompanySettingsSectionProps) {
-  const supabase = createClient()
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
 
@@ -28,9 +26,11 @@ export default function CompanySettingsSection({ company }: CompanySettingsSecti
     if (!company?.id) return
     setSaving(true)
     try {
-      const { error } = await supabase
-        .from('companies')
-        .update({
+      const res = await fetch('/api/company', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: company.id,
           name: name.trim() || null,
           business_type: businessType,
           email: email.trim() || null,
@@ -39,10 +39,10 @@ export default function CompanySettingsSection({ company }: CompanySettingsSecti
           city: city.trim() || null,
           state: state.trim() || null,
           postal_code: postalCode.trim() || null,
-        })
-        .eq('id', company.id)
-
-      if (error) throw error
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to save company settings')
 
       toast({ title: 'Saved', description: 'Company settings updated successfully.' })
     } catch (err: any) {

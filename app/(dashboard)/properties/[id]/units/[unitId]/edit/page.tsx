@@ -2,13 +2,12 @@
 
 import { useState, useEffect, use } from 'react'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge, Trash2, Calendar as CalIcon } from 'lucide-react'
 import Link from 'next/link'
 import ScheduleBuilder from '@/components/scheduling/ScheduleBuilder'
 
-type UnitType = 'residential_pool' | 'main_pool' | 'kids_pool' | 'main_spa' | 'rooftop_spa' | 'plunge_pool' | 'villa_pool'
+type UnitType = 'residential_pool' | 'main_pool' | 'kids_pool' | 'main_spa' | 'rooftop_spa' | 'plunge_pool' | 'villa_pool' | 'splash_park'
 type WaterType = 'saltwater' | 'freshwater' | 'bromine'
 
 export default function EditUnitPage({
@@ -21,7 +20,6 @@ export default function EditUnitPage({
 
   const { data: session } = useSession()
   const router = useRouter()
-  const supabase = createClient()
   
   const [propertyName, setPropertyName] = useState('')
   const [customers, setCustomers] = useState<Array<{id: string, name: string, customer_type: string}>>([])
@@ -47,75 +45,37 @@ export default function EditUnitPage({
 
   // Load unit data
   useEffect(() => {
-    if (!session?.user?.company_id) return
-
     async function loadUnit() {
       try {
+        // Load unit (includes property name and has_bookings)
+        const unitRes = await fetch(`/api/units/${unitId}`)
+        const unitJson = await unitRes.json().catch(() => ({}))
+        if (!unitRes.ok || unitJson?.error) throw new Error(unitJson?.error || 'Failed to load unit')
+        const unit = unitJson.unit
+        setPropertyName(unit?.property?.name || '')
 
-        // Load property name
-        const { data: property } = await supabase
-          .from('properties')
-          .select('name')
-          .eq('id', propertyId)
-          .eq('company_id', session.user.company_id)
-          .single()
-
-        if (property) {
-          setPropertyName(property.name)
-        }
-
-        // Load customers for dropdown
-        const { data: customersData } = await supabase
-          .from('customers')
-          .select('id, name, customer_type')
-          .eq('company_id', session.user.company_id)
-          .eq('is_active', true)
-          .order('name')
-
-        if (customersData) {
-          setCustomers(customersData)
-        }
-
-        // Load unit
-        const { data: unit, error: unitError } = await supabase
-          .from('units')
-          .select('*, property:properties!inner(company_id), service_frequency')
-          .eq('id', unitId)
-          .eq('property_id', propertyId)
-          .single()
-
-        if (unitError) throw unitError
-        if (unit.property.company_id !== profile.company_id) throw new Error('Unauthorized')
+        // Customers for dropdown
+        const custRes = await fetch('/api/customers')
+        const custJson = await custRes.json().catch(() => ({}))
+        setCustomers(custRes.ok && !custJson?.error ? (custJson.customers || []) : [])
 
         // Populate form
-        setUnitNumber(unit.unit_number || '')
-        setName(unit.name || '')
-        setUnitType(unit.unit_type)
-        setWaterType(unit.water_type)
-        setVolumeLitres(unit.volume_litres ? unit.volume_litres.toString() : '')
-        setBillingEntity(unit.billing_entity || 'property')
-        setCustomerId(unit.customer_id || '')
-        setOldVolume(unit.volume_litres)
-        setNotes(unit.notes || '')
-
-        // Detect if property/units use bookings (simple heuristic: any bookings exist for unit)
-        const { data: bookingExists } = await supabase
-          .from('bookings')
-          .select('id')
-          .eq('unit_id', unitId)
-          .limit(1)
-
-        setHasBookings(!!(bookingExists && bookingExists.length))
+        setUnitNumber(unit?.unit_number || '')
+        setName(unit?.name || '')
+        setUnitType((unit?.unit_type as UnitType) || 'residential_pool')
+        setWaterType(unit?.water_type || 'saltwater')
+        setVolumeLitres(unit?.volume_litres != null ? String(unit.volume_litres) : '')
+        setBillingEntity(unit?.billing_entity || 'property')
+        setCustomerId(unit?.customer_id || '')
+        setOldVolume(unit?.volume_litres ?? null)
+        setNotes(unit?.notes || '')
+        setHasBookings(!!unit?.has_bookings)
 
         // Load existing custom schedule if service_frequency is custom
-        if (unit.service_frequency === 'custom') {
-          const { data: existingSchedule } = await supabase
-            .from('custom_schedules')
-            .select('schedule_type, schedule_config, service_types, name, description')
-            .eq('unit_id', unitId)
-            .eq('is_active', true)
-            .single()
-          if (existingSchedule) setCustomSchedule(existingSchedule)
+        if (unit?.service_frequency === 'custom') {
+          const schedRes = await fetch(`/api/units/${unitId}/custom-schedule`)
+          const schedJson = await schedRes.json().catch(() => ({}))
+          if (schedRes.ok && !schedJson?.error && schedJson.schedule) setCustomSchedule(schedJson.schedule)
         }
       } catch (err: any) {
         setError(err.message || 'Failed to load unit')
@@ -124,7 +84,7 @@ export default function EditUnitPage({
       }
     }
     loadUnit()
-  }, [propertyId, unitId, supabase, session])
+  }, [propertyId, unitId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -133,11 +93,10 @@ export default function EditUnitPage({
 
     try {
       const newVolume = volumeLitres ? parseInt(volumeLitres) : null
-
-      // Update unit
-      const { error: updateError } = await supabase
-        .from('units')
-        .update({
+      const res = await fetch(`/api/units/${unitId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           unit_number: unitNumber.trim() || null,
           name: name.trim() || null,
           unit_type: unitType,
@@ -146,30 +105,10 @@ export default function EditUnitPage({
           billing_entity: billingEntity,
           customer_id: customerId || null,
           notes: notes.trim() || null,
-        })
-        .eq('id', unitId)
-
-      if (updateError) throw updateError
-
-      // Update property total volume if volume changed
-      if (oldVolume !== newVolume) {
-        const { data: property } = await supabase
-          .from('properties')
-          .select('total_volume_litres')
-          .eq('id', propertyId)
-          .single()
-
-        if (property) {
-          const currentTotal = property.total_volume_litres || 0
-          const volumeDiff = (newVolume || 0) - (oldVolume || 0)
-          const newTotal = Math.max(0, currentTotal + volumeDiff)
-
-          await supabase
-            .from('properties')
-            .update({ total_volume_litres: newTotal })
-            .eq('id', propertyId)
-        }
-      }
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to update unit')
 
       // Success - redirect to unit detail page
       router.push(`/properties/${propertyId}/units/${unitId}`)
@@ -189,30 +128,9 @@ export default function EditUnitPage({
     setError(null)
 
     try {
-      // Update property total volume
-      if (oldVolume) {
-        const { data: property } = await supabase
-          .from('properties')
-          .select('total_volume_litres')
-          .eq('id', propertyId)
-          .single()
-
-        if (property) {
-          const newTotal = Math.max(0, (property.total_volume_litres || 0) - oldVolume)
-          await supabase
-            .from('properties')
-            .update({ total_volume_litres: newTotal })
-            .eq('id', propertyId)
-        }
-      }
-
-      // Delete unit (cascade will delete related records)
-      const { error: deleteError } = await supabase
-        .from('units')
-        .delete()
-        .eq('id', unitId)
-
-      if (deleteError) throw deleteError
+      const res = await fetch(`/api/units/${unitId}`, { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to delete unit')
 
       // Success - redirect to property detail page
       router.push(`/properties/${propertyId}`)
@@ -287,6 +205,7 @@ export default function EditUnitPage({
               <option value="rooftop_spa">Rooftop Spa</option>
               <option value="plunge_pool">Plunge Pool (Villa)</option>
               <option value="villa_pool">Villa Pool</option>
+              <option value="splash_park">Splash Park</option>
             </select>
           </div>
 
@@ -480,30 +399,13 @@ export default function EditUnitPage({
               initialSchedule={customSchedule}
               onCancel={() => setShowScheduleBuilder(false)}
               onSave={async (schedule) => {
-                // Upsert custom schedule and mark unit as custom frequency
-                // Avoid onConflict for portability; do a delete+insert
-                await supabase
-                  .from('custom_schedules')
-                  .delete()
-                  .eq('unit_id', unitId)
-
-                const { error: upsertError } = await supabase
-                  .from('custom_schedules')
-                  .insert({
-                    unit_id: unitId,
-                    schedule_type: schedule.schedule_type,
-                    schedule_config: schedule.schedule_config,
-                    service_types: schedule.service_types,
-                    name: schedule.name,
-                    description: schedule.description,
-                    is_active: true
-                  })
-
-                if (!upsertError) {
-                  await supabase
-                    .from('units')
-                    .update({ service_frequency: 'custom' })
-                    .eq('id', unitId)
+                const res = await fetch(`/api/units/${unitId}/custom-schedule`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(schedule),
+                })
+                const json = await res.json().catch(() => ({}))
+                if (res.ok && !json?.error) {
                   setCustomSchedule(schedule)
                   setShowScheduleBuilder(false)
                 }

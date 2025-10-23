@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Plus, Save, Trash2, Calendar, User, Home } from 'lucide-react'
 import DateRangePicker from '@/components/DateRangePicker'
 
@@ -47,56 +46,34 @@ export default function BookingsPage({ params }: Props) {
 
   const router = useRouter()
   const { data: session } = useSession()
-  const supabase = useMemo(() => createClient(), [])
 
   const loadData = useCallback(async (propId: string) => {
-    if (!session?.user?.company_id) return
-
     try {
 
-      // Load property
-      const { data: propertyData, error: propertyError } = await supabase
-        .from('properties')
-        .select(`
-          *,
-          units(id, name, unit_type)
-        `)
-        .eq('id', propId)
-        .eq('company_id', session.user.company_id)
-        .single()
+      // Load property (with units)
+      const propRes = await fetch(`/api/properties/${propId}`)
+      const propJson = await propRes.json().catch(() => ({}))
+      if (!propRes.ok || propJson?.error) throw new Error(propJson?.error || 'Failed to load property')
+      setProperty(propJson.property as Property)
 
-      if (propertyError) throw propertyError
-      if (!propertyData) throw new Error('Property not found')
-
-      setProperty(propertyData)
-
-      // Load bookings
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          unit:units(id, name, unit_type)
-        `)
-        .eq('unit.property_id', propId)
-        .order('check_in_date', { ascending: false })
-
-      if (bookingsError) throw bookingsError
-      setBookings((bookingsData || []) as Booking[])
+      // Load bookings (no date filters in UI; fetch all for property)
+      const bookingsRes = await fetch(`/api/bookings?propertyId=${propId}`)
+      const bookingsJson = await bookingsRes.json().catch(() => ({}))
+      if (!bookingsRes.ok || bookingsJson?.error) throw new Error(bookingsJson?.error || 'Failed to load bookings')
+      setBookings((bookingsJson.bookings || []) as Booking[])
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [supabase, session])
+  }, [])
 
   useEffect(() => {
-    if (!session?.user?.company_id) return
-
     params.then((resolvedParams) => {
       setPropertyId(resolvedParams.id)
       loadData(resolvedParams.id)
     })
-  }, [params, loadData, session])
+  }, [params, loadData])
 
   const handleAddBooking = async (bookingData: Omit<Booking, 'id' | 'unit'>) => {
     try {
@@ -122,22 +99,19 @@ export default function BookingsPage({ params }: Props) {
         throw new Error('Check-out date must be after check-in date')
       }
 
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert({
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           unit_id: unit.id,
           check_in_date: bookingData.check_in_date,
-          check_out_date: bookingData.check_out_date
-        })
-        .select(`
-          *,
-          unit:units(id, name, unit_type)
-        `)
-        .single()
+          check_out_date: bookingData.check_out_date,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to add booking')
 
-      if (error) throw error
-
-      setBookings(prev => [data as Booking, ...prev])
+      setBookings(prev => [json.booking as Booking, ...prev])
       setShowAddForm(false)
     } catch (err: any) {
       setError(err.message)
@@ -156,16 +130,17 @@ export default function BookingsPage({ params }: Props) {
       setSaving(true)
       setError(null)
 
-      const { error } = await supabase
-        .from('bookings')
-        .update({
+      const res = await fetch(`/api/bookings/${bookingData.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           unit_id: bookingData.unit_id,
           check_in_date: bookingData.check_in_date,
-          check_out_date: bookingData.check_out_date
-        })
-        .eq('id', bookingData.id)
-
-      if (error) throw error
+          check_out_date: bookingData.check_out_date,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to update booking')
 
       setBookings(prev => prev.map(booking => 
         booking.id === bookingData.id ? (bookingData as Booking) : booking
@@ -187,12 +162,9 @@ export default function BookingsPage({ params }: Props) {
       setSaving(true)
       setError(null)
 
-      const { error } = await supabase
-        .from('bookings')
-        .delete()
-        .eq('id', bookingId)
-
-      if (error) throw error
+      const res = await fetch(`/api/bookings/${bookingId}`, { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to delete booking')
 
       setBookings(prev => prev.filter(booking => booking.id !== bookingId))
     } catch (err: any) {
@@ -233,11 +205,7 @@ export default function BookingsPage({ params }: Props) {
           continue
         }
 
-        bookingsToAdd.push({
-          unit_id: unit.id,
-          check_in_date: booking.checkInDate,
-          check_out_date: booking.checkOutDate
-        })
+        bookingsToAdd.push({ unit_id: unit.id, check_in_date: booking.checkInDate, check_out_date: booking.checkOutDate })
       }
 
       if (errors.length > 0) {
@@ -247,18 +215,18 @@ export default function BookingsPage({ params }: Props) {
       if (bookingsToAdd.length === 0) {
         throw new Error('No valid units found')
       }
+      const results = await Promise.all(bookingsToAdd.map(async (b) => {
+        const res = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(b),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to add booking')
+        return json.booking as Booking
+      }))
 
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert(bookingsToAdd)
-        .select(`
-          *,
-          unit:units(id, name, unit_type)
-        `)
-
-      if (error) throw error
-
-      setBookings(prev => [...((data || []) as Booking[]), ...prev])
+      setBookings(prev => [...results, ...prev])
       setShowBulkForm(false)
     } catch (err: any) {
       setError(err.message)

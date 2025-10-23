@@ -1,4 +1,4 @@
-import NextAuth, { type NextAuthOptions } from 'next-auth'
+import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
@@ -14,7 +14,7 @@ if (!NEXTAUTH_URL) {
   throw new Error('NEXTAUTH_URL/AUTH_URL is not set')
 }
 
-export const authOptions: NextAuthOptions = {
+export const authOptions = {
   pages: {
     signIn: '/login',
     error: '/login',
@@ -27,7 +27,8 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        const { email, password } = (credentials || {}) as Record<'email' | 'password', string>
+        if (!email || !password) {
           throw new Error('Email and password required')
         }
 
@@ -58,7 +59,7 @@ export const authOptions: NextAuthOptions = {
           const { data: profile, error: profileError } = await supabaseAdmin
             .from('profiles')
             .select('id, email, role, company_id')
-            .eq('email', credentials.email)
+            .eq('email', email)
             .single()
 
           if (profileError || !profile) {
@@ -67,8 +68,8 @@ export const authOptions: NextAuthOptions = {
 
           // Verify password using admin client
           const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
-            email: credentials.email,
-            password: credentials.password,
+            email,
+            password,
           })
 
           if (authError || !authData.user) {
@@ -93,6 +94,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = user.role
+        token.email = user.email
         token.company_id = user.company_id
       }
       return token
@@ -107,7 +109,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
   session: {
-    strategy: 'jwt',
+    strategy: 'jwt' as const,
     maxAge: 60 * 60 * 24, // 24 hours
   },
   jwt: {

@@ -9,10 +9,10 @@ import WaterQualityChart from '@/components/WaterQualityChart'
 export default async function UnitDetailPage({
   params,
 }: {
-  params: Promise<{ id: string; unitId: string }>
+  params: { id: string; unitId: string }
 }) {
-  // Await params for Next.js 15
-  const { id: propertyId, unitId } = await params
+  // Params
+  const { id: propertyId, unitId } = params
 
   // Get user data from middleware headers
   const headersList = await headers()
@@ -44,7 +44,7 @@ export default async function UnitDetailPage({
     .eq('property_id', propertyId)
     .single()
 
-  if (error || !unit || unit.property.company_id !== profile!.company_id) {
+  if (error || !unit || unit.property.company_id !== companyId) {
     notFound()
   }
 
@@ -63,7 +63,7 @@ export default async function UnitDetailPage({
   // Get latest service and equipment count
   const { data: latestService } = await supabase
     .from('services')
-    .select('id, service_date, service_type, status, technician_name')
+    .select('id, service_date, service_type, status')
     .eq('unit_id', unitId)
     .order('service_date', { ascending: false })
     .limit(1)

@@ -7,9 +7,9 @@ import { ArrowLeft, Edit, Calendar, User, Droplets, AlertTriangle, CheckCircle, 
 export default async function ServiceDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
-  const { id: serviceId } = await params
+  const { id: serviceId } = params
 
   // Get user data from middleware headers
   const headersList = await headers()

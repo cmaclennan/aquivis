@@ -7,7 +7,7 @@ import { Shield, Building2, Users, Activity, LogOut, ChevronDown } from 'lucide-
 interface Company {
   id: string
   name: string
-  business_type: string
+  business_type?: string
   email: string
   created_at: string
   user_count: number

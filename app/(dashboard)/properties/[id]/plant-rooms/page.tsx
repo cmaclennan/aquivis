@@ -1,12 +1,10 @@
 'use client'
 
-import { use, useEffect, useState, useMemo } from 'react'
+import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 export default function PlantRoomsListPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: propertyId } = use(params)
-  const supabase = useMemo(() => createClient(), [])
   const [plantRooms, setPlantRooms] = useState<any[]>([])
   const [propertyName, setPropertyName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -16,21 +14,18 @@ export default function PlantRoomsListPage({ params }: { params: Promise<{ id: s
     ;(async () => {
       try {
         setLoading(true)
-        const { data: property } = await supabase.from('properties').select('name').eq('id', propertyId).single()
-        setPropertyName(property?.name || '')
-        const { data } = await supabase
-          .from('plant_rooms')
-          .select('id, name, check_frequency, is_active')
-          .eq('property_id', propertyId)
-          .order('name')
-        setPlantRooms(data || [])
+        const res = await fetch(`/api/properties/${propertyId}`)
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load plant rooms')
+        setPropertyName(json?.property?.name || '')
+        setPlantRooms(json?.property?.plant_rooms || [])
       } catch (e: any) {
         setError(e.message)
       } finally {
         setLoading(false)
       }
     })()
-  }, [propertyId, supabase])
+  }, [propertyId])
 
   return (
     <div className="p-8">

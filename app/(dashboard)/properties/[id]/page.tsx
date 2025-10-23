@@ -8,10 +8,10 @@ import { formatLitresShort } from '@/lib/utils'
 export default async function PropertyDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
-  // Await params for Next.js 15
-  const { id: propertyId } = await params
+  // Params
+  const { id: propertyId } = params
 
   // Get user data from middleware headers
   const headersList = await headers()

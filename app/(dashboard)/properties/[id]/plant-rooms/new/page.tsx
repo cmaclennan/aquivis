@@ -2,11 +2,9 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 export default function NewPlantRoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: propertyId } = use(params)
-  const supabase = createClient()
   const [name, setName] = useState('')
   const [checkFrequency, setCheckFrequency] = useState('daily')
   const [checkTimes, setCheckTimes] = useState<string[]>(['09:00'])
@@ -37,16 +35,21 @@ export default function NewPlantRoomPage({ params }: { params: Promise<{ id: str
       const checkDaysToSave = checkFrequency === 'specific_days'
         ? (checkDays.length ? checkDays.map(d => dayNameToInt[d] ?? null).filter((v) => v !== null) : null)
         : null
-      const { error } = await supabase.from('plant_rooms').insert({
-        property_id: propertyId,
-        name,
-        check_frequency: checkFrequency,
-        check_times: checkTimes,
-        check_days: checkDaysToSave,
-        notes: notes || null,
-        is_active: true,
+      const res = await fetch('/api/plant-rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          property_id: propertyId,
+          name,
+          check_frequency: checkFrequency,
+          check_times: checkTimes,
+          check_days: checkDaysToSave,
+          notes: notes || null,
+          is_active: true,
+        }),
       })
-      if (error) throw error
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to create plant room')
       window.location.href = `/properties/${propertyId}/plant-rooms`
     } catch (e: any) {
       setError(e.message)
