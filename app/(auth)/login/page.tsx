@@ -40,20 +40,15 @@ function LoginInner() {
       const response = await fetch('/api/auth/session')
       const session = await response.json()
 
-      console.log('[LOGIN] Session after signIn:', session)
-      console.log('[LOGIN] company_id:', session?.user?.company_id)
-      console.log('[LOGIN] role:', session?.user?.role)
+      
 
       if (session?.user) {
         // Redirect based on role
         if (session.user.role === 'super_admin') {
-          console.log('[LOGIN] Redirecting to /super-admin')
           router.push('/super-admin')
         } else if (session.user.company_id) {
-          console.log('[LOGIN] Redirecting to /dashboard')
           router.push('/dashboard')
         } else {
-          console.log('[LOGIN] Redirecting to /onboarding')
           router.push('/onboarding')
         }
       }
