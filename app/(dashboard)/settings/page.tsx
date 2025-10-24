@@ -24,7 +24,13 @@ export default async function SettingsPage() {
   }
 
   const isOwner = userRole === 'owner'
-  const res = await fetch('/api/company', { cache: 'no-store' })
+  const proto = headersList.get('x-forwarded-proto') || 'http'
+  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'localhost:3000'
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `${proto}://${host}`
+  const res = await fetch(`${baseUrl}/api/company`, {
+    cache: 'no-store',
+    headers: { cookie: (headersList.get('cookie') || '') as any },
+  })
   const json = await res.json().catch(() => ({}))
   const company = res.ok && !json?.error ? json.company : null
 

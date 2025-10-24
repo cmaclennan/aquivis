@@ -8,10 +8,10 @@ import { formatLitresShort } from '@/lib/utils'
 export default async function PropertyDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
   // Params
-  const { id: propertyId } = params
+  const { id: propertyId } = await params
 
   // Get user data from middleware headers
   const headersList = await headers()

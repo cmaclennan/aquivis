@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { getRequestUser } from '@/lib/api-auth'
 
-export async function GET() {
-  const session = await auth()
-  
+export async function GET(req: Request) {
+  if (process.env.E2E_TEST_MODE !== '1') {
+    return NextResponse.json({}, { status: 404 })
+  }
+  const user = await getRequestUser(req)
+
   return NextResponse.json({
-    session,
-    hasSession: !!session,
-    hasUser: !!session?.user,
-    userId: session?.user?.id,
-    userEmail: session?.user?.email,
-    userRole: session?.user?.role,
-    userCompanyId: session?.user?.company_id,
+    hasUser: !!user,
+    userId: user?.id,
+    userEmail: user?.email,
+    userRole: user?.role,
+    userCompanyId: user?.company_id,
   })
 }
 

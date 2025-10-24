@@ -23,6 +23,58 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
+  // Allow NextAuth API routes to pass through
+  if (pathname.startsWith('/api/auth')) {
+    return NextResponse.next()
+  }
+
+  // Skip API routes unless explicit bypass header is present AND test mode enabled
+  const hasBypassHeader = req.headers.get('x-e2e-bypass') === '1'
+  const testMode = process.env.E2E_TEST_MODE === '1'
+  if (pathname.startsWith('/api') && !(testMode && hasBypassHeader)) {
+    return NextResponse.next()
+  }
+
+  // E2E bypass: requires test mode AND header
+  if (testMode && hasBypassHeader) {
+    const bypass = req.cookies.get('e2e-auth')?.value
+    if (bypass) {
+      try {
+        const payload = JSON.parse(bypass) as {
+          id?: string
+          email?: string
+          role?: string
+          company_id?: string
+        }
+        const requestHeaders = new Headers(req.headers)
+        if (payload.id) requestHeaders.set('x-user-id', payload.id)
+        if (payload.email) requestHeaders.set('x-user-email', payload.email)
+        if (payload.role) requestHeaders.set('x-user-role', payload.role)
+        if (payload.company_id) requestHeaders.set('x-user-company-id', payload.company_id)
+        return NextResponse.next({
+          request: { headers: requestHeaders },
+        })
+      } catch {}
+      try {
+        const decoded = decodeURIComponent(bypass)
+        const payload = JSON.parse(decoded) as {
+          id?: string
+          email?: string
+          role?: string
+          company_id?: string
+        }
+        const requestHeaders = new Headers(req.headers)
+        if (payload.id) requestHeaders.set('x-user-id', payload.id)
+        if (payload.email) requestHeaders.set('x-user-email', payload.email)
+        if (payload.role) requestHeaders.set('x-user-role', payload.role)
+        if (payload.company_id) requestHeaders.set('x-user-company-id', payload.company_id)
+        return NextResponse.next({
+          request: { headers: requestHeaders },
+        })
+      } catch {}
+    }
+  }
+
   // Get NextAuth token (unified secret resolution)
   const SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
   const token = await getToken({ req, secret: SECRET })
@@ -77,12 +129,11 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
      */
-    '/((?!api|_next/static|_next/image|monitoring|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|monitoring|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

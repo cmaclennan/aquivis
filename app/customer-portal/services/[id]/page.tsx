@@ -8,9 +8,9 @@ import { ArrowLeft, Calendar, MapPin, Droplets, FileText, CheckCircle2, AlertTri
 export default async function CustomerServiceDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
-  const { id: serviceId } = params
+  const { id: serviceId } = await params
 
   // Get user data from middleware headers
   const headersList = await headers()

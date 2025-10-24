@@ -7,10 +7,10 @@ import { ArrowLeft, Users, MapPin, Phone, Mail, CreditCard, Building2, Droplets 
 export default async function CustomerDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
   // Params
-  const { id: customerId } = params
+  const { id: customerId } = await params
 
   // Get user data from middleware headers
   const headersList = await headers()

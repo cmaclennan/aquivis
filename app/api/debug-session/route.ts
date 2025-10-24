@@ -3,6 +3,9 @@ import { getToken } from 'next-auth/jwt'
 import { headers, cookies } from 'next/headers'
 
 export async function GET(request: Request) {
+  if (process.env.E2E_TEST_MODE !== '1') {
+    return NextResponse.json({}, { status: 404 })
+  }
   const SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
   const token = await getToken({ 
     req: request as any, 

@@ -1,15 +1,15 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: plantRoomId } = params
+    const { id: plantRoomId } = await params
     const session = await auth()
     const userId = session?.user?.id
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })

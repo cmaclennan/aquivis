@@ -75,6 +75,22 @@ export const customerUpdateSchema = customerSchema.partial().extend({
 })
 
 // ============================================
+// COMPANY VALIDATION SCHEMA
+// ============================================
+
+export const companyUpdateSchema = z.object({
+  id: z.string().min(1, 'Company ID is required'),
+  name: z.string().max(100, 'Name too long').optional().or(z.literal('')).nullable(),
+  business_type: z.string().max(50, 'Business type too long').optional().or(z.literal('')).nullable(),
+  email: emailSchema.nullable(),
+  phone: phoneSchema.nullable(),
+  address: addressSchema.nullable(),
+  city: cityStateSchema.nullable(),
+  state: cityStateSchema.nullable(),
+  postal_code: postalCodeSchema.nullable(),
+})
+
+// ============================================
 // PROPERTY VALIDATION SCHEMAS
 // ============================================
 

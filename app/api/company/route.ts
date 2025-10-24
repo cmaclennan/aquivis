@@ -1,34 +1,24 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getCompanyById, getCompanyIdForUser, updateCompanyById } from '@/lib/data/company'
+import { companyUpdateSchema, safeParse, formatValidationErrors } from '@/lib/validations/schemas'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
+    const t0 = Date.now()
     const session = await auth()
     const userId = session?.user?.id
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
-    const supabase = createAdminClient() as any
-
-    const { data: prof } = await supabase
-      .from('profiles' as any)
-      .select('company_id')
-      .eq('id', userId)
-      .single()
-
-    const companyId = prof?.company_id
+    const companyId = await getCompanyIdForUser(userId)
     if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 })
 
-    const { data, error } = await supabase
-      .from('companies' as any)
-      .select('id, name, business_type, email, phone, address, city, state, postal_code, subscription_tier, subscription_status')
-      .eq('id', companyId)
-      .single()
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ company: data || null })
+    const data = await getCompanyById(companyId)
+    const res = NextResponse.json({ company: data || null })
+    res.headers.set('Server-Timing', `db;dur=${Date.now() - t0}`)
+    return res
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
   }
@@ -36,45 +26,40 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   try {
+    const t0 = Date.now()
     const session = await auth()
     const userId = session?.user?.id
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
     const updates = await req.json().catch(() => ({}))
-    const supabase = createAdminClient() as any
-
-    const { data: prof } = await supabase
-      .from('profiles' as any)
-      .select('company_id')
-      .eq('id', userId)
-      .single()
-
-    const companyId = prof?.company_id
+    const parsed = safeParse(companyUpdateSchema, updates)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: formatValidationErrors(parsed.errors!) }, { status: 400 })
+    }
+    const valid = parsed.data
+    const companyId = await getCompanyIdForUser(userId)
     if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 })
 
-    if (!updates?.id || updates.id !== companyId) {
+    if (!valid?.id || valid.id !== companyId) {
       return NextResponse.json({ error: 'Invalid company id' }, { status: 400 })
     }
 
     const payload: any = {
-      name: updates.name ?? null,
-      business_type: updates.business_type ?? null,
-      email: updates.email ?? null,
-      phone: updates.phone ?? null,
-      address: updates.address ?? null,
-      city: updates.city ?? null,
-      state: updates.state ?? null,
-      postal_code: updates.postal_code ?? null,
+      name: valid.name ?? null,
+      business_type: valid.business_type ?? null,
+      email: valid.email ?? null,
+      phone: valid.phone ?? null,
+      address: valid.address ?? null,
+      city: valid.city ?? null,
+      state: valid.state ?? null,
+      postal_code: valid.postal_code ?? null,
     }
 
-    const { error } = await supabase
-      .from('companies' as any)
-      .update(payload)
-      .eq('id', companyId)
+    await updateCompanyById(companyId, payload)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    return NextResponse.json({ ok: true })
+    const res = NextResponse.json({ ok: true })
+    res.headers.set('Server-Timing', `db;dur=${Date.now() - t0}`)
+    return res
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
   }

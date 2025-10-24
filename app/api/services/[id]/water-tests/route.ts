@@ -1,54 +1,33 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { resolveCompanyIdForUser, createWaterTestForService } from '@/lib/data/services'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const t0 = Date.now()
+    const { id } = await params
     const session = await auth()
     const userId = session?.user?.id
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
     const payload = await req.json().catch(() => ({}))
-    const supabase = createAdminClient() as any
-
-    const { data: prof } = await supabase
-      .from('profiles' as any)
-      .select('company_id')
-      .eq('id', userId)
-      .single()
-
-    const companyId = prof?.company_id
+    const companyId = await resolveCompanyIdForUser(userId)
     if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 })
 
-    // Validate service belongs to company
-    const { data: owned } = await supabase
-      .from('services' as any)
-      .select('id, units!inner(properties!inner(company_id))')
-      .eq('id', id)
-      .eq('units.properties.company_id', companyId)
-      .single()
-    if (!owned) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-    const insert = {
-      service_id: id,
-      test_time: new Date().toISOString(),
-      ...payload,
+    try {
+      const data = await createWaterTestForService(id, payload, companyId)
+      const res = NextResponse.json({ waterTest: data })
+      res.headers.set('Server-Timing', `db;dur=${Date.now() - t0}`)
+      return res
+    } catch (err: any) {
+      const status = err?.message === 'Not found' ? 404 : 400
+      return NextResponse.json({ error: err?.message || 'Unexpected error' }, { status })
     }
-
-    const { data, error } = await supabase
-      .from('water_tests' as any)
-      .insert(insert as any)
-      .select('*')
-      .single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    return NextResponse.json({ waterTest: data })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
   }

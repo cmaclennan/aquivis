@@ -1,4 +1,5 @@
 import NextAuth from 'next-auth'
+import { cookies, headers } from 'next/headers'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
@@ -33,6 +34,34 @@ export const authOptions = {
         }
 
         try {
+          if (process.env.E2E_TEST_MODE === '1') {
+            if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+              throw new Error('Configuration: Missing Supabase URL')
+            }
+            if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+              throw new Error('Configuration: Missing service role key')
+            }
+            const supabaseAdmin = createSupabaseClient(
+              process.env.NEXT_PUBLIC_SUPABASE_URL,
+              process.env.SUPABASE_SERVICE_ROLE_KEY,
+              { auth: { autoRefreshToken: false, persistSession: false } }
+            )
+            const { data: profile, error: profileError } = await supabaseAdmin
+              .from('profiles')
+              .select('id, email, role, company_id')
+              .eq('email', email)
+              .single()
+            if (profileError || !profile) {
+              throw new Error('Invalid credentials')
+            }
+            return {
+              id: profile.id,
+              email: profile.email,
+              role: profile.role || 'user',
+              company_id: profile.company_id,
+            }
+          }
+
           // Validate environment variables
           if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             throw new Error('Configuration: Missing Supabase URL')
@@ -119,5 +148,57 @@ export const authOptions = {
   trustHost: true,
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
+const AuthKit = NextAuth(authOptions)
+export const { handlers, signIn, signOut } = AuthKit
+
+export async function auth(...args: any[]) {
+  try {
+    const hdrs = await headers()
+    const testMode = process.env.E2E_TEST_MODE === '1' && hdrs.get('x-e2e-bypass') === '1'
+
+    if (testMode) {
+      // 1) If explicit identity headers are present, synthesize a session
+      const idFromHdr = hdrs.get('x-user-id') || undefined
+      if (idFromHdr) {
+        return {
+          user: {
+            id: idFromHdr,
+            email: hdrs.get('x-user-email') || '',
+            role: hdrs.get('x-user-role') || 'user',
+            company_id: (hdrs.get('x-user-company-id') as string) || null,
+          },
+        } as any
+      }
+
+      // 2) Fallback to e2e-auth cookie if provided
+      const store = await cookies()
+      let raw = store.get('e2e-auth')?.value
+      if (!raw) {
+        const cookieHeader = hdrs.get('cookie') || ''
+        const match = cookieHeader.split(';').map(s => s.trim()).find(s => s.startsWith('e2e-auth='))
+        if (match) raw = decodeURIComponent(match.slice('e2e-auth='.length))
+      }
+      if (raw) {
+        let payload: { id?: string; email?: string; role?: string; company_id?: string } | null = null
+        try { payload = JSON.parse(raw) } catch {}
+        if (!payload) {
+          try { payload = JSON.parse(decodeURIComponent(raw)) } catch {}
+        }
+        if (payload?.id) {
+          return {
+            user: {
+              id: payload.id,
+              email: payload.email || '',
+              role: payload.role || 'user',
+              company_id: payload.company_id || null,
+            },
+          } as any
+        }
+      }
+    }
+  } catch {}
+  // Fallback to real NextAuth auth
+  // @ts-expect-error - forwarding optional args as NextAuth's auth signature can vary
+  return AuthKit.auth(...args)
+}
 

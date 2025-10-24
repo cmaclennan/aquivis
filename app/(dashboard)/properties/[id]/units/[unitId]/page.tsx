@@ -8,10 +8,10 @@ import WaterQualityChart from '@/components/WaterQualityChart'
 export default async function UnitDetailPage({
   params,
 }: {
-  params: { id: string; unitId: string }
+  params: Promise<{ id: string; unitId: string }>
 }) {
   // Params
-  const { id: propertyId, unitId } = params
+  const { id: propertyId, unitId } = await params
 
   // Get user data from middleware headers
   const headersList = await headers()

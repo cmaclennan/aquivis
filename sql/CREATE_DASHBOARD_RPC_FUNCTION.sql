@@ -80,7 +80,7 @@ BEGIN
       'status', s.status,
       'property_name', p.name,
       'property_address', p.address,
-      'technician_name', prof.full_name,
+      'technician_name', COALESCE(NULLIF(trim(concat_ws(' ', prof.first_name, prof.last_name)), ''), prof.email),
       'created_at', s.created_at,
       'notes', s.notes,
       'water_test_ok', COALESCE(wt.all_parameters_ok, true)

@@ -24,7 +24,7 @@ interface Service {
 export default async function ServicesPage({
   searchParams,
 }: {
-  searchParams: { page?: string }
+  searchParams: Promise<{ page?: string }>
 }) {
   // Get user data from middleware headers
   const headersList = await headers()
@@ -45,7 +45,8 @@ export default async function ServicesPage({
     )
   }
 
-  const page = Math.max(1, Number(searchParams?.page) || 1)
+  const { page: pageParam } = await searchParams
+  const page = Math.max(1, Number(pageParam) || 1)
   const pageSize = 24
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1

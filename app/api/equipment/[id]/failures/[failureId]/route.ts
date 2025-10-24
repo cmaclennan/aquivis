@@ -1,15 +1,15 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 
 export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string; failureId: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string; failureId: string }> }
 ) {
   try {
-    const { id, failureId } = params
+    const { id, failureId } = await params
     const session = await auth()
     const userId = session?.user?.id
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
