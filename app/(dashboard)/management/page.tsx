@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { BarChart3, Users, ClipboardList, Calendar, Filter, Download } from 'lucide-react'
 
@@ -12,6 +13,7 @@ interface KPI {
 }
 
 export default function ManagementDashboardPage() {
+  const { data: session } = useSession()
   const supabase = useMemo(() => createClient(), [])
   const [kpi, setKpi] = useState<KPI>({ totalServices: 0, completedToday: 0, pendingToday: 0, testsToday: 0 })
   const [activities, setActivities] = useState<any[]>([])
@@ -27,23 +29,15 @@ export default function ManagementDashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Load properties and technicians
       const [{ data: props }, { data: techs }] = await Promise.all([
-        supabase.from('properties').select('id, name').eq('company_id', profile.company_id),
-        supabase.from('profiles').select('id, first_name, last_name').eq('company_id', profile.company_id).eq('role', 'technician')
+        supabase.from('properties').select('id, name').eq('company_id', session.user.company_id),
+        supabase.from('profiles').select('id, first_name, last_name').eq('company_id', session.user.company_id).eq('role', 'technician')
       ])
       setProperties(props || [])
       setTechnicians(techs || [])
@@ -96,11 +90,12 @@ export default function ManagementDashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, filters])
+  }, [supabase, filters, session])
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
     loadData()
-  }, [loadData])
+  }, [loadData, session])
 
   const exportActivityCsv = () => {
     const rows = [

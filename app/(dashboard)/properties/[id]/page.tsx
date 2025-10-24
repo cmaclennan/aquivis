@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { ArrowLeft, Building2, MapPin, Phone, Mail, User, Plus, Droplets, Calendar } from 'lucide-react'
 import { formatLitresShort } from '@/lib/utils'
@@ -11,21 +12,21 @@ export default async function PropertyDetailPage({
 }) {
   // Await params for Next.js 15
   const { id: propertyId } = await params
-  
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const companyId = headersList.get('x-user-company-id')
+
+  if (!userId) {
     redirect('/login')
   }
-  
-  // Get user's company
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('company_id')
-    .eq('id', user.id)
-    .single()
+
+  if (!companyId) {
+    redirect('/onboarding')
+  }
+
+  const supabase = await createClient()
 
   // Get property with units and customer info
   const { data: property, error } = await supabase
@@ -35,7 +36,7 @@ export default async function PropertyDetailPage({
       units:units(*, customers(name, customer_type))
     `)
     .eq('id', propertyId)
-    .eq('company_id', profile!.company_id)
+    .eq('company_id', companyId)
     .single()
 
   if (error || !property) {

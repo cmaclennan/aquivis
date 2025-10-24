@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { Building2, CheckCircle2, User, Calendar, Clock, AlertTriangle, TrendingUp, Plus, Droplets } from 'lucide-react'
 import Link from 'next/link'
 import { SentryErrorBoundaryClass } from '@/components/ui/sentry-error-boundary'
@@ -7,21 +8,16 @@ import { PageLoadTracker } from '@/components/metrics/PageLoadTracker'
 import { logger } from '@/lib/logger'
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const companyId = headersList.get('x-user-company-id')
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!userId) {
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*, companies(*)')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.company_id) {
+  if (!companyId) {
     return (
       <div className="p-8">
         <div className="text-center py-8">
@@ -30,6 +26,14 @@ export default async function DashboardPage() {
       </div>
     )
   }
+
+  const supabase = await createClient()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*, companies(*)')
+    .eq('id', userId)
+    .single()
 
   // Use optimized dashboard RPC function for 70-90% faster loading
   let dashboardData: any = null

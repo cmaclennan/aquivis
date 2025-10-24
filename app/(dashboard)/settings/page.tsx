@@ -1,31 +1,36 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { Settings, Building2, CreditCard, Bell, Shield, Users } from 'lucide-react'
 import CompanySettingsSection from './sections/CompanySettingsSection'
 
 export default async function SettingsPage() {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userRole = headersList.get('x-user-role')
+  const companyId = headersList.get('x-user-company-id')
+
+  if (!userId) {
     redirect('/login')
   }
-  
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*, companies(*)')
-    .eq('id', user.id)
-    .single()
 
-  if (!profile?.company_id) {
+  if (!companyId) {
     redirect('/onboarding')
   }
 
   // Only owners and managers can access settings
-  if (profile?.role !== 'owner' && profile?.role !== 'manager') {
+  if (userRole !== 'owner' && userRole !== 'manager') {
     redirect('/dashboard')
   }
+
+  const supabase = await createClient()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*, companies(*)')
+    .eq('id', userId)
+    .single()
 
   return (
     <div className="p-8">

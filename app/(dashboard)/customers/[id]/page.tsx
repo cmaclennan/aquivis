@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { ArrowLeft, Users, MapPin, Phone, Mail, CreditCard, Building2, Droplets } from 'lucide-react'
 
@@ -10,21 +11,21 @@ export default async function CustomerDetailPage({
 }) {
   // Await params for Next.js 15
   const { id: customerId } = await params
-  
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const companyId = headersList.get('x-user-company-id')
+
+  if (!userId) {
     redirect('/login')
   }
-  
-  // Get user's company
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('company_id')
-    .eq('id', user.id)
-    .single()
+
+  if (!companyId) {
+    redirect('/onboarding')
+  }
+
+  const supabase = await createClient()
 
   if (!profile?.company_id) {
     redirect('/onboarding')
@@ -39,7 +40,7 @@ export default async function CustomerDetailPage({
       units:units(id, name, unit_number, unit_type)
     `)
     .eq('id', customerId)
-    .eq('company_id', profile!.company_id)
+    .eq('company_id', companyId)
     .single()
 
   if (error || !customer) {

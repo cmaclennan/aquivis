@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
@@ -61,22 +62,15 @@ export default function EditServicePage({ params }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [serviceId, setServiceId] = useState<string>('')
-  
+
+  const { data: session } = useSession()
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
   const loadService = useCallback(async (id: string) => {
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       const { data, error } = await supabase
         .from('services')
@@ -89,7 +83,7 @@ export default function EditServicePage({ params }: Props) {
           maintenance_tasks(*)
         `)
         .eq('id', id)
-        .eq('property.company_id', profile.company_id)
+        .eq('property.company_id', session.user.company_id)
         .single()
 
       if (error) throw error
@@ -101,7 +95,7 @@ export default function EditServicePage({ params }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, session])
 
   useEffect(() => {
     params.then((resolvedParams) => {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -8,6 +9,7 @@ import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft } from 'lucide-react'
 
 export default function InviteTeamMemberPage() {
+  const { data: session } = useSession()
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const { toast } = useToast()
@@ -21,42 +23,28 @@ export default function InviteTeamMemberPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-        if (!profile?.company_id) return
         const { data: custs } = await supabase
           .from('customers')
           .select('id, name')
-          .eq('company_id', profile.company_id)
+          .eq('company_id', session.user.company_id)
           .order('name')
         setCustomers(custs || [])
       } catch {}
     })()
-  }, [supabase])
+  }, [supabase, session])
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!session?.user?.company_id) return
+
     setLoading(true)
     try {
-      // Create an invitation row with token
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: me } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-      if (!me?.company_id) throw new Error('No company found')
-
       const { data: invite, error } = await supabase.from('team_invitations').insert({
-        company_id: me.company_id,
+        company_id: session.user.company_id,
         email: email.trim(),
         role,
         customer_id: role === 'customer' ? (customerId || null) : null,

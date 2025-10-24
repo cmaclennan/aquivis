@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge, Trash2, Calendar as CalIcon } from 'lucide-react'
@@ -17,7 +18,8 @@ export default function EditUnitPage({
 }) {
   // Unwrap params for Next.js 15
   const { id: propertyId, unitId } = use(params)
-  
+
+  const { data: session } = useSession()
   const router = useRouter()
   const supabase = createClient()
   
@@ -45,25 +47,17 @@ export default function EditUnitPage({
 
   // Load unit data
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     async function loadUnit() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile?.company_id) throw new Error('No company found')
 
         // Load property name
         const { data: property } = await supabase
           .from('properties')
           .select('name')
           .eq('id', propertyId)
-          .eq('company_id', profile.company_id)
+          .eq('company_id', session.user.company_id)
           .single()
 
         if (property) {
@@ -74,7 +68,7 @@ export default function EditUnitPage({
         const { data: customersData } = await supabase
           .from('customers')
           .select('id, name, customer_type')
-          .eq('company_id', profile.company_id)
+          .eq('company_id', session.user.company_id)
           .eq('is_active', true)
           .order('name')
 
@@ -130,7 +124,7 @@ export default function EditUnitPage({
       }
     }
     loadUnit()
-  }, [propertyId, unitId, supabase])
+  }, [propertyId, unitId, supabase, session])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

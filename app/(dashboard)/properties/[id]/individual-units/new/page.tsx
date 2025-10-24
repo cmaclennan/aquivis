@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge, Building2, User, CreditCard } from 'lucide-react'
@@ -22,6 +23,7 @@ export default function NewIndividualUnitPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  const { data: session } = useSession()
   const router = useRouter()
   const supabase = createClient()
   const [propertyId, setPropertyId] = useState<string>('')
@@ -46,24 +48,16 @@ export default function NewIndividualUnitPage({
   const [customers, setCustomers] = useState<Customer[]>([])
 
   const loadData = useCallback(async (resolvedPropertyId: string) => {
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Load property
       const { data: propertyData, error: propertyError } = await supabase
         .from('properties')
         .select('id, name, property_type')
         .eq('id', resolvedPropertyId)
-        .eq('company_id', profile.company_id)
+        .eq('company_id', session.user.company_id)
         .single()
 
       if (propertyError) throw propertyError
@@ -73,7 +67,7 @@ export default function NewIndividualUnitPage({
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
         .select('id, name, customer_type')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', session.user.company_id)
         .order('name')
 
       if (customersError) throw customersError
@@ -81,7 +75,7 @@ export default function NewIndividualUnitPage({
     } catch (err: any) {
       setError(err.message)
     }
-  }, [supabase])
+  }, [supabase, session])
 
   useEffect(() => {
     // Resolve params Promise
@@ -93,20 +87,12 @@ export default function NewIndividualUnitPage({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!session?.user?.company_id) return
+
     setLoading(true)
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Create individual unit
       const { data: unit, error: unitError } = await supabase

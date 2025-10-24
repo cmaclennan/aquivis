@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { use } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -18,6 +19,7 @@ type Rule = {
 
 export default function PropertySchedulingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: propertyId } = use(params)
+  const { data: session } = useSession()
   const supabase = useMemo(() => createClient(), [])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -35,18 +37,10 @@ export default function PropertySchedulingPage({ params }: { params: Promise<{ i
   })
 
   const load = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       const [{ data: property }, { data: u }, { data: r }] = await Promise.all([
         supabase.from('properties').select('name').eq('id', propertyId).single(),
@@ -77,11 +71,12 @@ export default function PropertySchedulingPage({ params }: { params: Promise<{ i
     } finally {
       setLoading(false)
     }
-  }, [supabase, propertyId])
+  }, [supabase, propertyId, session])
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
     load()
-  }, [load])
+  }, [load, session])
 
   const saveRule = async () => {
     try {

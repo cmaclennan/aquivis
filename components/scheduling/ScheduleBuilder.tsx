@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useSession } from 'next-auth/react'
 import { Calendar, Clock, Settings, Shuffle, Plus, Trash2, Save, Home } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -62,6 +63,7 @@ export default function ScheduleBuilder({
   const [scheduleType, setScheduleType] = useState<ScheduleType>('simple')
   const [scheduleName, setScheduleName] = useState('')
   const [scheduleDescription, setScheduleDescription] = useState('')
+  const { data: session } = useSession()
   const supabase = useMemo(() => createClient(), [])
   const [companyId, setCompanyId] = useState<string>('')
   const [templates, setTemplates] = useState<any[]>([])
@@ -177,27 +179,21 @@ export default function ScheduleBuilder({
 
   // Load company id and templates
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-        if (!profile?.company_id) return
-        setCompanyId(profile.company_id)
+        setCompanyId(session.user.company_id)
         const { data: tpl } = await supabase
           .from('schedule_templates')
           .select('id, template_name, template_type, template_config')
-          .eq('company_id', profile.company_id)
+          .eq('company_id', session.user.company_id)
           .eq('is_active', true)
           .order('template_name')
         setTemplates(tpl || [])
       } catch {}
     })()
-  }, [supabase])
+  }, [supabase, session])
 
   // Handle simple schedule changes
   const updateSimpleConfig = (field: keyof SimpleScheduleConfig, value: any) => {

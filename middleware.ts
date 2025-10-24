@@ -27,23 +27,8 @@ export async function middleware(req: NextRequest) {
   const SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
   const token = await getToken({ req, secret: SECRET })
 
-  // Debug logging (production-safe via Sentry breadcrumbs)
-  if (pathname.startsWith('/dashboard')) {
-    const logData = {
-      pathname,
-      hasToken: !!token,
-      tokenRole: token?.role,
-      secretSource: process.env.AUTH_SECRET ? 'AUTH_SECRET' : 'NEXTAUTH_SECRET',
-      cookieHeader: req.headers.get('cookie')?.substring(0, 100) + '...',
-    }
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Middleware] Token check:', logData)
-    }
-  }
-
   // Public routes that don't require auth
-  const publicRoutes = ['/login', '/signup', '/super-admin-login', '/customer-portal/login', '/']
+  const publicRoutes = ['/login', '/signup', '/super-admin-login', '/customer-portal/login', '/', '/onboarding']
 
   // Check if route is public
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
@@ -55,7 +40,7 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL('/super-admin-login', req.url))
     } else if (pathname.startsWith('/customer-portal')) {
       return NextResponse.redirect(new URL('/customer-portal/login', req.url))
-    } else if (pathname.startsWith('/dashboard') || pathname.startsWith('/properties') || pathname.startsWith('/services') || pathname.startsWith('/customers') || pathname.startsWith('/jobs') || pathname.startsWith('/schedule') || pathname.startsWith('/reports') || pathname.startsWith('/settings') || pathname.startsWith('/team') || pathname.startsWith('/profile') || pathname.startsWith('/equipment') || pathname.startsWith('/management') || pathname.startsWith('/monitoring')) {
+    } else {
       return NextResponse.redirect(new URL('/login', req.url))
     }
   }
@@ -70,11 +55,22 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  return NextResponse.next({
-    request: {
-      headers: req.headers,
-    },
-  })
+  // Pass user data to layouts via headers (so server components can access it)
+  if (token) {
+    const requestHeaders = new Headers(req.headers)
+    requestHeaders.set('x-user-id', token.id as string)
+    requestHeaders.set('x-user-email', token.email as string)
+    requestHeaders.set('x-user-role', token.role as string)
+    requestHeaders.set('x-user-company-id', (token.company_id as string) || '')
+
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    })
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {

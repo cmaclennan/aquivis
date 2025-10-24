@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ArrowRight, CheckCircle, Clock, Droplets } from 'lucide-react'
@@ -83,10 +84,11 @@ const STEPS = [
 ]
 
 export default function NewGuidedServicePage() {
+  const { data: session } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
-  
+
   // Current step (1-6)
   const [currentStep, setCurrentStep] = useState(1)
   const [serviceData, setServiceData] = useState<ServiceData>({
@@ -101,7 +103,7 @@ export default function NewGuidedServicePage() {
     photos: [],
     notes: ''
   })
-  
+
   // Data
   const [unit, setUnit] = useState<Unit | null>(null)
   const [units, setUnits] = useState<Unit[]>([])
@@ -110,23 +112,15 @@ export default function NewGuidedServicePage() {
   const [error, setError] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Load technicians
       const { data: techsData, error: techsError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', session.user.company_id)
         .eq('role', 'technician')
         .order('first_name')
 
@@ -143,7 +137,7 @@ export default function NewGuidedServicePage() {
           water_type,
           property:properties(id, name)
         `)
-        .eq('property.company_id', profile.company_id)
+        .eq('property.company_id', session.user.company_id)
         .order('name')
 
       if (unitsError) throw unitsError
@@ -156,7 +150,7 @@ export default function NewGuidedServicePage() {
     } catch (err: any) {
       setError(err.message)
     }
-  }, [supabase])
+  }, [supabase, session])
 
   const loadUnit = useCallback(async (unitId: string) => {
     try {
@@ -237,17 +231,9 @@ export default function NewGuidedServicePage() {
     setLoading(true)
     setError(null)
 
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Create service
       const { data: service, error: serviceError } = await supabase

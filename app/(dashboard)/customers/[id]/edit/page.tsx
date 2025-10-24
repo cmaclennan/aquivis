@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Mail, Phone, MapPin, CreditCard, Trash2 } from 'lucide-react'
@@ -17,8 +18,9 @@ export default function EditCustomerPage({
   const { id: customerId } = use(params)
   
   const router = useRouter()
+  const { data: session } = useSession()
   const supabase = createClient()
-  
+
   // Form state
   const [name, setName] = useState('')
   const [customerType, setCustomerType] = useState<CustomerType>('property_owner')
@@ -39,24 +41,15 @@ export default function EditCustomerPage({
 
   // Load customer data
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     async function loadCustomer() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile?.company_id) throw new Error('No company found')
-
         const { data: customer, error: customerError } = await supabase
           .from('customers')
           .select('*')
           .eq('id', customerId)
-          .eq('company_id', profile.company_id)
+          .eq('company_id', session.user.company_id)
           .single()
 
         if (customerError) throw customerError
@@ -80,7 +73,7 @@ export default function EditCustomerPage({
       }
     }
     loadCustomer()
-  }, [customerId, supabase])
+  }, [customerId, supabase, session])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

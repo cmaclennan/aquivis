@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import SuperAdminLayout from '@/components/super-admin/SuperAdminLayout'
 
@@ -7,15 +7,18 @@ export default async function SuperAdminLayoutWrapper({
 }: {
   children: React.ReactNode
 }) {
-  // Check NextAuth session
-  const session = await auth()
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userRole = headersList.get('x-user-role')
 
-  if (!session?.user) {
+  // If no user data in headers, middleware didn't authenticate
+  if (!userId) {
     redirect('/super-admin-login')
   }
 
   // Check if user is super admin
-  if (session.user.role !== 'super_admin') {
+  if (userRole !== 'super_admin') {
     redirect('/super-admin-login')
   }
 

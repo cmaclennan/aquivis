@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { BarChart3, TrendingUp, Calendar, Filter, Download, X } from 'lucide-react'
@@ -42,10 +43,10 @@ export default function ReportsClient() {
   const [equipmentLogs, setEquipmentLogs] = useState<any[]>([])
   const [includeTechCsv, setIncludeTechCsv] = useState(false)
   const [includeActionDetailsCsv, setIncludeActionDetailsCsv] = useState(false)
-  
+
   const [filters, setFilters] = useState<Filters>({
     dateRange: '30d',
-    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
     serviceType: '',
     unitType: '',
@@ -53,26 +54,19 @@ export default function ReportsClient() {
     status: ''
   })
 
+  const { data: session } = useSession()
   const supabase = useMemo(() => createClient(), [])
 
   const loadData = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Load properties and customers
       const [{ data: propertiesData, error: propertiesError }, { data: customersData, error: customersError }] = await Promise.all([
-        supabase.from('properties').select('id, name').eq('company_id', profile.company_id),
-        supabase.from('customers').select('id, name').eq('company_id', profile.company_id)
+        supabase.from('properties').select('id, name').eq('company_id', session.user.company_id),
+        supabase.from('customers').select('id, name').eq('company_id', session.user.company_id)
       ])
 
       if (propertiesError) throw propertiesError
@@ -155,19 +149,13 @@ export default function ReportsClient() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, filters])
+  }, [supabase, filters, session])
 
   const loadEquipmentData = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Date filter
       const startIso = `${filters.startDate}T00:00:00.000Z`
@@ -176,7 +164,7 @@ export default function ReportsClient() {
       let eqQuery = supabase
         .from('equipment_maintenance_logs')
         .select('maintenance_date, maintenance_time, actions, notes, equipment:equipment_id(name, properties!inner(id, name, company_id))')
-        .eq('equipment.properties.company_id', profile.company_id)
+        .eq('equipment.properties.company_id', session.user.company_id)
         .gte('maintenance_date', filters.startDate)
         .lte('maintenance_date', filters.endDate)
         .order('maintenance_date', { ascending: false })
@@ -193,15 +181,17 @@ export default function ReportsClient() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, filters])
+  }, [supabase, filters, session])
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     if (activeTab === 'services') {
       loadData()
     } else {
       loadEquipmentData()
     }
-  }, [filters, activeTab, loadData, loadEquipmentData])
+  }, [filters, activeTab, loadData, loadEquipmentData, session])
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters(prev => {
@@ -257,21 +247,16 @@ export default function ReportsClient() {
   const exportBillingCsv = async () => {
     // Build a grouped billing export by customer and property for chemicals
     // and append Jobs (existing customers + one-off)
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
       const startIso = `${filters.startDate}T00:00:00.000Z`
       const endIso = `${filters.endDate}T23:59:59.999Z`
 
       let rowsQuery = supabase
         .from('chemical_additions')
         .select(`quantity, unit_of_measure, chemical_type, services!inner(service_date, units!inner(id, customer_id, properties!inner(id, name, customer_id, company_id)))`)
-        .eq('services.units.properties.company_id', profile!.company_id)
+        .eq('services.units.properties.company_id', session.user.company_id)
         .gte('services.service_date', startIso)
         .lte('services.service_date', endIso)
 
@@ -366,20 +351,15 @@ export default function ReportsClient() {
   }
 
   const exportEquipmentCsv = async () => {
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
       const startIso = `${filters.startDate}T00:00:00.000Z`
       const endIso = `${filters.endDate}T23:59:59.999Z`
       const { data: logs } = await supabase
         .from('equipment_maintenance_logs')
         .select('maintenance_date, maintenance_time, actions, notes, performed_by, equipment:equipment_id(name, properties!inner(name, company_id))')
-        .eq('equipment.properties.company_id', profile!.company_id)
+        .eq('equipment.properties.company_id', session.user.company_id)
         .gte('maintenance_date', filters.startDate)
         .lte('maintenance_date', filters.endDate)
         .order('maintenance_date', { ascending: false })

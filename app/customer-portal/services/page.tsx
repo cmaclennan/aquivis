@@ -1,20 +1,25 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { Calendar, Droplets, CheckCircle2, Clock, FileText } from 'lucide-react'
 
 export default async function CustomerServicesPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userEmail = headersList.get('x-user-email')
 
-  if (!user) {
+  if (!userId) {
     redirect('/customer-portal/login')
   }
+
+  const supabase = await createClient()
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, email')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single()
 
   // Get customer IDs for this user
@@ -27,7 +32,7 @@ export default async function CustomerServicesPage() {
   const { data: linked } = await supabase
     .from('customer_user_links')
     .select('customer_id, customers:customers(id, name)')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
 
   const allowedCustomerIds: string[] = []
   if (emailCustomer) allowedCustomerIds.push(emailCustomer.id)

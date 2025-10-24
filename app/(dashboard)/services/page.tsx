@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { useState, useMemo, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Calendar, User, Droplets, AlertTriangle, CheckCircle, Edit, Trash2 } from 'lucide-react'
@@ -25,6 +26,7 @@ interface Service {
 
 export default function ServicesPage() {
   const [error, setError] = useState<string | null>(null)
+  const { data: session } = useSession()
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -43,18 +45,11 @@ export default function ServicesPage() {
 
   // Use React Query for caching and performance
   const { data: services = [], isLoading: loading, error: queryError, refetch } = useQuery({
-    queryKey: ['services', page],
+    queryKey: ['services', page, session?.user?.company_id],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
+      if (!session?.user?.company_id) {
+        throw new Error('Not authenticated or no company found')
+      }
 
       // Try optimized view first, fallback to basic query if not available
       let data, error
@@ -62,7 +57,7 @@ export default function ServicesPage() {
         const result = await supabase
           .from('services_optimized')
           .select('*')
-          .eq('company_id', profile.company_id)
+          .eq('company_id', session.user.company_id)
           .order('service_date', { ascending: false })
           .range(from, to)
         data = result.data
@@ -79,7 +74,7 @@ export default function ServicesPage() {
               properties!inner(name, company_id)
             )
           `)
-          .eq('units.properties.company_id', profile.company_id)
+          .eq('units.properties.company_id', session.user.company_id)
           .order('service_date', { ascending: false })
           .range(from, to)
         data = result.data
@@ -93,6 +88,7 @@ export default function ServicesPage() {
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!session?.user?.company_id,
   })
 
   useEffect(() => {

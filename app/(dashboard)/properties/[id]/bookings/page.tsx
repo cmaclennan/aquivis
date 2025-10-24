@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Plus, Save, Trash2, Calendar, User, Home } from 'lucide-react'
 import DateRangePicker from '@/components/DateRangePicker'
@@ -43,22 +44,15 @@ export default function BookingsPage({ params }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [propertyId, setPropertyId] = useState<string>('')
-  
+
   const router = useRouter()
+  const { data: session } = useSession()
   const supabase = useMemo(() => createClient(), [])
 
   const loadData = useCallback(async (propId: string) => {
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Load property
       const { data: propertyData, error: propertyError } = await supabase
@@ -68,7 +62,7 @@ export default function BookingsPage({ params }: Props) {
           units(id, name, unit_type)
         `)
         .eq('id', propId)
-        .eq('company_id', profile.company_id)
+        .eq('company_id', session.user.company_id)
         .single()
 
       if (propertyError) throw propertyError
@@ -93,14 +87,16 @@ export default function BookingsPage({ params }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, session])
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     params.then((resolvedParams) => {
       setPropertyId(resolvedParams.id)
       loadData(resolvedParams.id)
     })
-  }, [params, loadData])
+  }, [params, loadData, session])
 
   const handleAddBooking = async (bookingData: Omit<Booking, 'id' | 'unit'>) => {
     try {

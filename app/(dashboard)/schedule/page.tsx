@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { Calendar, Clock, User, Home, Droplets, Settings, CheckCircle, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
@@ -35,7 +36,8 @@ export default function SchedulePage({}: Props) {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all')
   const [technicians, setTechnicians] = useState<Array<{ id: string; name: string }>>([])
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('all')
-  
+
+  const { data: session } = useSession()
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -51,24 +53,16 @@ export default function SchedulePage({}: Props) {
   }, [selectedPropertyId])
 
   const loadSchedule = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Get all properties for the company
       const { data: properties, error: propertiesError } = await supabase
         .from('properties')
         .select('id, name')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', session.user.company_id)
 
       if (propertiesError) throw propertiesError
 
@@ -332,11 +326,12 @@ export default function SchedulePage({}: Props) {
     } finally {
       setLoading(false)
     }
-  }, [supabase, selectedDate, selectedPropertyId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supabase, selectedDate, selectedPropertyId, session]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
     loadSchedule()
-  }, [loadSchedule])
+  }, [loadSchedule, session])
 
   // Generate tasks from a unit's custom schedule
   const generateTasksFromCustomSchedule = (
