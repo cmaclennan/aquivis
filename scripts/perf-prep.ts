@@ -60,8 +60,9 @@ async function main() {
     config: {
       target: 'http://localhost:3000',
       phases: [
-        { duration: 30, arrivalRate: 1 },
-        { duration: 120, arrivalRate: 5, rampTo: 10 },
+        { duration: 30, arrivalRate: 5 },
+        { duration: 120, arrivalRate: 10, rampTo: 20 },
+        { duration: 60, arrivalRate: 20 },
       ],
       plugins: {
         expect: {}
@@ -78,8 +79,6 @@ async function main() {
       {
         name: 'Read endpoints',
         flow: [
-          { get: { url: '/api/debug-auth', expect: [ { statusCode: 200 }, { json: '$.hasUser', equals: true } ], afterResponse: 'recordServerTiming' } },
-          { get: { url: '/api/dashboard/summary', expect: [ { statusCode: 200 } ], afterResponse: 'recordServerTiming' } },
           { get: { url: '/api/reports/lookups', expect: [ { statusCode: 200 } ], afterResponse: 'recordServerTiming' } },
           { get: { url: '/api/templates', expect: [ { statusCode: 200 } ], afterResponse: 'recordServerTiming' } },
           { get: { url: '/api/units', expect: [ { statusCode: 200 } ], afterResponse: 'recordServerTiming' } },
