@@ -6,7 +6,14 @@ function getAdmin(supabase?: Supa): Supa {
   return supabase || (createAdminClient() as any)
 }
 
+const templatesCache: Map<string, { data: any[]; at: number }> = new Map()
+const TEMPLATES_TTL_MS = 30_000
+
 export async function listTemplatesForCompany(companyId: string, supabase?: Supa) {
+  const now = Date.now()
+  const cached = templatesCache.get(companyId)
+  if (cached && now - cached.at < TEMPLATES_TTL_MS) return cached.data
+
   const db = getAdmin(supabase)
   const { data, error } = await db
     .from('schedule_templates' as any)
@@ -14,7 +21,9 @@ export async function listTemplatesForCompany(companyId: string, supabase?: Supa
     .eq('company_id', companyId)
     .order('template_name')
   if (error) throw new Error(error.message)
-  return data || []
+  const result = data || []
+  templatesCache.set(companyId, { data: result, at: now })
+  return result
 }
 
 export async function createTemplateForCompany(companyId: string, payload: any, supabase?: Supa) {

@@ -6,6 +6,9 @@ function getAdmin(supabase?: Supa): Supa {
   return supabase || (createAdminClient() as any)
 }
 
+const lookupsCache: Map<string, { data: any; at: number }> = new Map()
+const LOOKUPS_TTL_MS = 30_000
+
 export async function technicianNames(ids: string[], supabase?: Supa) {
   const db = getAdmin(supabase)
   if (!ids?.length) return {}
@@ -133,12 +136,18 @@ export async function chemicalsSummary(companyId: string, filters: any = {}, sup
 }
 
 export async function lookups(companyId: string, supabase?: Supa) {
+  const now = Date.now()
+  const cached = lookupsCache.get(companyId)
+  if (cached && now - cached.at < LOOKUPS_TTL_MS) return cached.data
+
   const db = getAdmin(supabase)
   const [{ data: properties }, { data: customers }] = await Promise.all([
     db.from('properties' as any).select('id, name').eq('company_id', companyId).order('name'),
     db.from('customers' as any).select('id, name').eq('company_id', companyId).order('name'),
   ])
-  return { properties: properties || [], customers: customers || [] }
+  const result = { properties: properties || [], customers: customers || [] }
+  lookupsCache.set(companyId, { data: result, at: now })
+  return result
 }
 
 export async function billingReport(companyId: string, startDate: string, endDate: string, supabase?: Supa) {
