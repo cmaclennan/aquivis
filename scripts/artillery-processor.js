@@ -1,5 +1,7 @@
 // Artillery processor to record and summarize Server-Timing per endpoint
 // Usage: referenced by artillery.config.json as processor: './scripts/artillery-processor.js'
+const fs = require('fs')
+const path = require('path')
 
 const agg = {
   byUrl: Object.create(null),
@@ -60,6 +62,21 @@ process.on('exit', () => {
       }
       console.log(`  ${url} -> ${parts.join(', ')}`)
     }
+
+    // Persist JSON artifact for CI
+    const summary = {}
+    for (const [url, row] of entries) {
+      const avgs = {}
+      for (const [k, sum] of Object.entries(row.sums)) {
+        avgs[k] = sum / row.count
+      }
+      summary[url] = { count: row.count, avg: avgs }
+    }
+    const reportsDir = path.resolve('reports')
+    try { fs.mkdirSync(reportsDir, { recursive: true }) } catch {}
+    const outPath = path.join(reportsDir, 'server-timing-summary.json')
+    fs.writeFileSync(outPath, JSON.stringify(summary, null, 2), 'utf-8')
+    console.log(`[artillery-processor] Wrote ${outPath}`)
   } catch {}
 })
 

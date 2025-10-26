@@ -44,6 +44,7 @@ jobs:
           name: artillery-baseline
           path: |
             artillery-report.json
+            reports/server-timing-summary.json
 
   perf-stress:
     name: Stress (ungated)
@@ -78,3 +79,4 @@ jobs:
           name: artillery-stress
           path: |
             artillery-stress-report.json
+            reports/server-timing-summary.json
