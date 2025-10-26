@@ -4,7 +4,6 @@ import * as path from 'path'
 import dotenv from 'dotenv'
 
 async function main() {
-  // Load env from .env.local if present
   try {
     await fs.access('.env.local')
     dotenv.config({ path: '.env.local' })
@@ -35,7 +34,6 @@ async function main() {
   }
   const cookieValue = encodeURIComponent(JSON.stringify(cookiePayload))
 
-  // Build common authenticated headers
   const commonHeaders: Record<string, string> = {
     Cookie: `e2e-auth=${cookieValue}`,
     'x-user-id': profile.id,
@@ -45,24 +43,18 @@ async function main() {
     'x-e2e-bypass': '1',
   }
 
-  // Write Lighthouse extra headers
-  const lhciHeaders = commonHeaders
-  await fs.writeFile(path.resolve('lhci-headers.json'), JSON.stringify(lhciHeaders, null, 2), 'utf-8')
-
-  // Prepare dates for Artillery requests
   const end = new Date()
   const start = new Date()
   start.setDate(end.getDate() - 30)
   const iso = (d: Date) => d.toISOString().slice(0, 10)
 
-  // Write Artillery config (JSON)
   const artilleryConfig = {
     config: {
       target: 'http://localhost:3000',
       phases: [
-        { duration: 30, arrivalRate: 3 },
-        { duration: 120, arrivalRate: 5, rampTo: 10 },
-        { duration: 60, arrivalRate: 10 },
+        { duration: 30, arrivalRate: 5 },
+        { duration: 120, arrivalRate: 10, rampTo: 20 },
+        { duration: 60, arrivalRate: 20 },
       ],
       plugins: {
         expect: {}
@@ -95,12 +87,10 @@ async function main() {
     ],
   }
 
-  await fs.writeFile(path.resolve('artillery.config.json'), JSON.stringify(artilleryConfig, null, 2), 'utf-8')
-
-  console.log('[perf-prep] Wrote lhci-headers.json and artillery.config.json')
+  await fs.writeFile(path.resolve('artillery.stress.config.json'), JSON.stringify(artilleryConfig, null, 2), 'utf-8')
 }
 
 main().catch((e) => {
-  console.error('[perf-prep] Error:', e.message)
+  console.error('[perf-prep-stress] Error:', e.message)
   process.exit(1)
 })
