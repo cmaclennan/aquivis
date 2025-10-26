@@ -21,10 +21,10 @@
     "start:perf": "set E2E_TEST_MODE=1 && next start",
     "perf:prep": "tsx scripts/perf-prep.ts",
     "perf:lhci": "lhci autorun",
-    "perf:lh:cli": "npm run build && start-server-and-test \"set E2E_TEST_MODE=1 && set PORT=3010 && next start\" http://localhost:3010 \"tsx scripts/lighthouse-collect.ts\"",
+    "perf:lh:cli": "set E2E_TEST_MODE=1 && npm run build && start-server-and-test \"set E2E_TEST_MODE=1 && set PORT=3010 && next start\" http://localhost:3010 \"tsx scripts/lighthouse-collect.ts\"",
     "perf:lh:summary": "tsx scripts/lh-summary.ts",
-    "perf:api": "npm run build && start-server-and-test start:perf http://localhost:3000 \"artillery run artillery.config.json\"",
-    "perf:probe": "npm run build && start-server-and-test start:perf http://localhost:3000 \"tsx scripts/perf-probe.ts\"",
+    "perf:api": "set E2E_TEST_MODE=1 && npm run build && start-server-and-test start:perf http://localhost:3000 \"artillery run artillery.config.json\"",
+    "perf:probe": "set E2E_TEST_MODE=1 && npm run build && start-server-and-test start:perf http://localhost:3000 \"tsx scripts/perf-probe.ts\"",
     "prepare": "husky"
   },
   "dependencies": {

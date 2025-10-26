@@ -28,15 +28,16 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  // Skip API routes unless explicit bypass header is present AND test mode enabled
+  // Secure E2E bypass: require env + header; otherwise skip API processing
   const hasBypassHeader = req.headers.get('x-e2e-bypass') === '1'
   const testMode = process.env.E2E_TEST_MODE === '1'
-  if (pathname.startsWith('/api') && !(testMode && hasBypassHeader)) {
+  const e2eEnabled = testMode && hasBypassHeader
+  if (pathname.startsWith('/api') && !e2eEnabled) {
     return NextResponse.next()
   }
 
-  // E2E bypass: requires test mode AND header
-  if (testMode && hasBypassHeader) {
+  // E2E bypass: inject x-user-* headers from e2e-auth cookie
+  if (e2eEnabled) {
     const bypass = req.cookies.get('e2e-auth')?.value
     if (bypass) {
       try {

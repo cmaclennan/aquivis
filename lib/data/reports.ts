@@ -55,12 +55,30 @@ export async function servicesReport(companyId: string, filters: any = {}, supab
   if (property) query = query.eq('units.properties.id', property)
   if (status) query = query.eq('status', status)
 
+  // Optional pagination
+  const limit = Number((filters as any)?.limit)
+  const offset = Number((filters as any)?.offset)
+  if (Number.isFinite(limit) && limit > 0) {
+    if (Number.isFinite(offset) && offset >= 0) {
+      query = query.range(offset, offset + limit - 1)
+    } else {
+      query = query.limit(limit)
+    }
+  }
+
   const { data, error } = await query.order('service_date', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
 }
 
-export async function equipmentLogsReport(companyId: string, startDate: string, endDate: string, property?: string, supabase?: Supa) {
+export async function equipmentLogsReport(
+  companyId: string,
+  startDate: string,
+  endDate: string,
+  property?: string,
+  supabase?: Supa,
+  options?: { limit?: number; offset?: number }
+) {
   const db = getAdmin(supabase)
   let query = db
     .from('equipment_maintenance_logs' as any)
@@ -70,6 +88,13 @@ export async function equipmentLogsReport(companyId: string, startDate: string, 
     .lte('maintenance_date', endDate)
     .order('maintenance_date', { ascending: false })
   if (property) query = query.eq('equipment.properties.id', property)
+  if (options?.limit && Number.isFinite(options.limit) && options.limit > 0) {
+    if (options?.offset && Number.isFinite(options.offset) && options.offset >= 0) {
+      query = query.range(options.offset, options.offset + options.limit - 1)
+    } else {
+      query = query.limit(options.limit)
+    }
+  }
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return data || []

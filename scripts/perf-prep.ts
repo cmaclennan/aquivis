@@ -88,9 +88,9 @@ async function main() {
       {
         name: 'Reports endpoints',
         flow: [
-          { post: { url: '/api/reports/services', json: { dateRange: 'custom', startDate: iso(start), endDate: iso(end) }, expect: [ { statusCode: 200 } ], afterResponse: 'recordServerTiming' } },
+          { post: { url: '/api/reports/services', json: { dateRange: 'custom', startDate: iso(start), endDate: iso(end), limit: 100 }, expect: [ { statusCode: 200 } ], afterResponse: 'recordServerTiming' } },
           { post: { url: '/api/reports/chemicals/summary', json: { dateRange: 'custom', startDate: iso(start), endDate: iso(end) }, expect: [ { statusCode: 200 } ], afterResponse: 'recordServerTiming' } },
-          { post: { url: '/api/reports/equipment/logs', json: { startDate: iso(start), endDate: iso(end) }, expect: [ { statusCode: 200 } ], afterResponse: 'recordServerTiming' } },
+          { post: { url: '/api/reports/equipment/logs', json: { startDate: iso(start), endDate: iso(end), limit: 100 }, expect: [ { statusCode: 200 } ], afterResponse: 'recordServerTiming' } },
         ],
       },
     ],

@@ -13,11 +13,11 @@ export async function POST(req: Request) {
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
     const body = await req.json().catch(() => ({}))
-    const { dateRange, startDate, endDate, serviceType, unitType, property, status } = body || {}
+    const { dateRange, startDate, endDate, serviceType, unitType, property, status, limit, offset } = body || {}
     const companyId = await resolveCompanyIdForUser(userId)
     if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 })
     try {
-      const data = await servicesReport(companyId, { dateRange, startDate, endDate, serviceType, unitType, property, status })
+      const data = await servicesReport(companyId, { dateRange, startDate, endDate, serviceType, unitType, property, status, limit, offset })
       const res = NextResponse.json({ services: data })
       res.headers.set('Server-Timing', `db;dur=${Date.now() - t0}`)
       return res
