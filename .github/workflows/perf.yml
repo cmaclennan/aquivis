@@ -12,9 +12,6 @@ jobs:
     env:
       NODE_ENV: production
       E2E_TEST_MODE: '1'
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,6 +22,10 @@ jobs:
 
       - name: Prepare perf configs
         run: npm run perf:prep
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
 
       - name: Build
         run: npm run build
@@ -37,6 +38,9 @@ jobs:
           P95_MAX_MS: '300'
           P99_MAX_MS: '600'
         run: npm run perf:gate
+
+      - name: Server-Timing budgets
+        run: npm run perf:timing:gate
 
       - name: Upload baseline artifacts
         uses: actions/upload-artifact@v4
@@ -53,9 +57,6 @@ jobs:
     env:
       NODE_ENV: production
       E2E_TEST_MODE: '1'
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -66,6 +67,10 @@ jobs:
 
       - name: Prepare stress perf configs
         run: npm run perf:prep:stress
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
 
       - name: Build
         run: npm run build

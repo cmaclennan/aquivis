@@ -6,6 +6,9 @@ function getAdmin(supabase?: Supa): Supa {
   return supabase || (createAdminClient() as any)
 }
 
+const unitsCache: Map<string, { data: any[]; at: number }> = new Map()
+const UNITS_TTL_MS = 30_000
+
 export async function ensureUnitOwnedByCompany(unitId: string, companyId: string, supabase?: Supa) {
   const db = getAdmin(supabase)
   const { data } = await db
@@ -19,6 +22,10 @@ export async function ensureUnitOwnedByCompany(unitId: string, companyId: string
 
 export async function listUnitsForCompany(companyId: string, filters: { propertyId?: string } = {}, supabase?: Supa) {
   const db = getAdmin(supabase)
+  const key = `${companyId}::${filters.propertyId || ''}`
+  const now = Date.now()
+  const cached = unitsCache.get(key)
+  if (cached && now - cached.at < UNITS_TTL_MS) return cached.data
   let query = db
     .from('units' as any)
     .select(`
@@ -42,6 +49,7 @@ export async function listUnitsForCompany(companyId: string, filters: { property
     water_type: u.water_type,
     property: Array.isArray(u.properties) ? u.properties[0] : u.properties,
   }))
+  unitsCache.set(key, { data: normalized, at: now })
   return normalized
 }
 

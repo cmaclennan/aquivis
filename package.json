@@ -28,6 +28,7 @@
     "perf:api:stress": "set E2E_TEST_MODE=1 && npm run build && start-server-and-test start:perf http://localhost:3000 \"artillery run -o artillery-stress-report.json artillery.stress.config.json\"",
     "perf:gate": "tsx scripts/perf-gate.ts",
     "perf:probe": "set E2E_TEST_MODE=1 && npm run build && start-server-and-test start:perf http://localhost:3000 \"tsx scripts/perf-probe.ts\"",
+    "perf:timing:gate": "tsx scripts/server-timing-gate.ts",
     "prepare": "husky"
   },
   "dependencies": {
