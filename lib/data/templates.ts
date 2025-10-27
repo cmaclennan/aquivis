@@ -45,6 +45,7 @@ export async function createTemplateForCompany(companyId: string, payload: any, 
     .select('*')
     .single()
   if (error) throw new Error(error.message)
+  templatesCache.delete(companyId)
   return data
 }
 
@@ -76,6 +77,7 @@ export async function updateTemplateForCompany(id: string, updates: any, company
     .update(payload)
     .eq('id', id)
   if (error) throw new Error(error.message)
+  templatesCache.delete(companyId)
   return { ok: true }
 }
 
@@ -88,5 +90,6 @@ export async function deleteTemplateForCompany(id: string, companyId: string, su
     .delete()
     .eq('id', id)
   if (error) throw new Error(error.message)
+  templatesCache.delete(companyId)
   return { ok: true }
 }

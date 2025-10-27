@@ -75,7 +75,9 @@ process.on('exit', () => {
     const reportsDir = path.resolve('reports')
     try { fs.mkdirSync(reportsDir, { recursive: true }) } catch {}
     const outPath = path.join(reportsDir, 'server-timing-summary.json')
-    fs.writeFileSync(outPath, JSON.stringify(summary, null, 2), 'utf-8')
+    const tmpPath = outPath + '.tmp'
+    fs.writeFileSync(tmpPath, JSON.stringify(summary, null, 2), 'utf-8')
+    try { fs.renameSync(tmpPath, outPath) } catch { fs.writeFileSync(outPath, JSON.stringify(summary, null, 2), 'utf-8') }
     console.log(`[artillery-processor] Wrote ${outPath}`)
   } catch {}
 })
