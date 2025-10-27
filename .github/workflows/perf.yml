@@ -85,3 +85,13 @@ jobs:
           path: |
             artillery-stress-report.json
             reports/server-timing-summary.json
+
+      - name: Server-Timing diff (info)
+        if: always()
+        run: |
+          mkdir -p baseline-artifacts/reports
+          echo "Downloading baseline artifact..."
+          gh run download --name artillery-baseline --dir baseline-artifacts || true
+          npm run perf:timing:diff
+        env:
+          GH_TOKEN: ${{ github.token }}
