@@ -8,6 +8,9 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     headless: true,
+    extraHTTPHeaders: {
+      'x-e2e-bypass': '1',
+    },
   },
   projects: [
     {

@@ -63,3 +63,7 @@ artillery.config.json
 .tmp/
 playwright-report/
 test-results/
+artillery-report.json
+artillery-stress-report.json
+artillery.stress.config.json
+playwright/.auth/

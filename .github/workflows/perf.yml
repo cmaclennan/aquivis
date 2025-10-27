@@ -29,9 +29,15 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
 
       - name: Run Artillery (baseline)
         run: npx start-server-and-test "next start" http://localhost:3000 "artillery run -o artillery-report.json artillery.config.json"
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
 
       - name: Gate thresholds
         env:
@@ -77,6 +83,10 @@ jobs:
 
       - name: Run Artillery (stress)
         run: npx start-server-and-test "next start" http://localhost:3000 "artillery run -o artillery-stress-report.json artillery.stress.config.json"
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
 
       - name: Upload stress artifacts
         uses: actions/upload-artifact@v4

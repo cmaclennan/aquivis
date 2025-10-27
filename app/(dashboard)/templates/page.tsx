@@ -33,11 +33,8 @@ export default function TemplatesPage() {
   const [renameValue, setRenameValue] = useState<string>('')
 
   const load = useCallback(async () => {
-    if (!session?.user?.company_id) return
-
     try {
       setLoading(true)
-      setCompanyId(session.user.company_id)
       const res = await fetch('/api/templates')
       const json = await res.json().catch(() => ({}))
       if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load templates')
@@ -50,7 +47,6 @@ export default function TemplatesPage() {
   }, [session])
 
   useEffect(() => {
-    if (!session?.user?.company_id) return
     load()
   }, [load, session])
 

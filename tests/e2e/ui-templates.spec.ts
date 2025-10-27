@@ -26,8 +26,13 @@ test('Templates UI: load, builder modal, rename, duplicate, delete', async ({ pa
   expect(created.ok).toBeTruthy()
 
   await page.reload()
-  await page.waitForLoadState('networkidle')
-  await expect(page.getByText(templateName)).toBeVisible({ timeout: 30000 })
+  await page.waitForLoadState('networkidle', { timeout: 30000 })
+  // Force a remount to ensure the page re-fetches templates deterministically
+  await page.goto('/dashboard')
+  await page.waitForLoadState('networkidle', { timeout: 30000 })
+  await page.goto('/templates')
+  await page.waitForLoadState('networkidle', { timeout: 30000 })
+  await expect(page.getByText(templateName, { exact: true })).toBeVisible({ timeout: 30000 })
 
   const rowByName = (name: string) => page.locator('div.py-3.flex.items-center.justify-between', { has: page.getByText(name, { exact: true }) }).first()
 
