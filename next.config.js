@@ -31,9 +31,9 @@ const nextConfig = {
   // External packages for server components
   serverExternalPackages: ['@supabase/ssr'],
   
-  // Skip TypeScript checking during build (temporary)
+  // Enforce TypeScript checking during build
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   
   // Bundle analyzer (uncomment to analyze bundle size)

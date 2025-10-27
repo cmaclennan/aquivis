@@ -33,7 +33,7 @@ describe('Server-Timing headers', () => {
   })
 
   it('sets Server-Timing on GET /api/templates', async () => {
-    const res: Response = await GET_TEMPLATES(new Request('http://localhost/api/templates'))
+    const res: Response = await GET_TEMPLATES()
     expect(res.status).toBe(200)
     const header = res.headers.get('Server-Timing')
     expect(header).toBeTruthy()
