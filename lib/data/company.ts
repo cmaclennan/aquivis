@@ -11,10 +11,19 @@ function getAdmin(supabase?: Supa): Supa {
   return supabase || (createAdminClient() as any)
 }
 
+const companyIdCache: Map<string, { id: string | null; at: number }> = new Map()
+const COMPANY_ID_TTL_MS = 60_000
+
 export async function getCompanyIdForUser(userId: string, supabase?: Supa): Promise<string | null> {
+  const now = Date.now()
+  const cached = companyIdCache.get(userId)
+  if (cached && now - cached.at < COMPANY_ID_TTL_MS) return cached.id
+
   const db = getAdmin(supabase)
   const { data } = await db.from('profiles' as any).select('company_id').eq('id', userId).single()
-  return data?.company_id ?? null
+  const id = data?.company_id ?? null
+  companyIdCache.set(userId, { id, at: now })
+  return id
 }
 
 export async function getCompanyById(companyId: string, supabase?: Supa) {
