@@ -106,30 +106,32 @@ export async function equipmentLogsReport(
 export async function chemicalsSummary(companyId: string, filters: any = {}, supabase?: Supa) {
   const db = getAdmin(supabase)
   const { dateRange, startDate, endDate } = filters || {}
-  let query = db
-    .from('chemical_additions' as any)
-    .select('chemical_type, unit_of_measure, quantity, services!inner(service_date, units!inner(properties!inner(company_id)))')
-    .eq('services.units.properties.company_id', companyId)
-
+  let startIso: string
+  let endIso: string
   if (dateRange === 'custom' && startDate && endDate) {
-    query = query
-      .gte('services.service_date', `${startDate}T00:00:00.000Z`)
-      .lte('services.service_date', `${endDate}T23:59:59.999Z`)
+    startIso = `${startDate}T00:00:00.000Z`
+    endIso = `${endDate}T23:59:59.999Z`
   } else {
     const days = dateRange === '7d' ? 7 : dateRange === '90d' ? 90 : 30
-    const d = new Date()
-    d.setDate(d.getDate() - days)
-    query = query.gte('services.service_date', d.toISOString())
+    const end = new Date()
+    const start = new Date()
+    start.setDate(end.getDate() - days)
+    startIso = start.toISOString()
+    endIso = end.toISOString()
   }
 
-  const { data, error } = await query
+  const { data, error } = await db.rpc('chemicals_summary_agg' as any, {
+    p_company_id: companyId,
+    p_start: startIso,
+    p_end: endIso,
+  })
   if (error) throw new Error(error.message)
 
   const grouped: Record<string, { quantity: number; unit: string }> = {}
   ;(data || []).forEach((row: any) => {
     const key = row.chemical_type || 'unknown'
     if (!grouped[key]) grouped[key] = { quantity: 0, unit: row.unit_of_measure || '' }
-    grouped[key].quantity += Number(row.quantity || 0)
+    grouped[key].quantity += Number(row.total || 0)
     grouped[key].unit = row.unit_of_measure || grouped[key].unit
   })
   return grouped
