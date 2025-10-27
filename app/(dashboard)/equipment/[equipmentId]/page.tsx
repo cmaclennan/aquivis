@@ -4,7 +4,6 @@ import { use } from 'react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, AlertTriangle, CheckCircle2, Clock, DollarSign, Wrench, Calendar, TrendingUp } from 'lucide-react'
 import { logger } from '@/lib/logger'
 
@@ -50,7 +49,6 @@ interface MaintenanceLog {
 
 export default function EquipmentDetailPage({ params }: { params: Promise<{ equipmentId: string }> }) {
   const { equipmentId } = use(params)
-  const supabase = createClient()
   const router = useRouter()
 
   const [equipment, setEquipment] = useState<Equipment | null>(null)
@@ -66,49 +64,30 @@ export default function EquipmentDetailPage({ params }: { params: Promise<{ equi
         setLoading(true)
 
         // Fetch equipment details
-        const { data: eq, error: eqError } = await supabase
-          .from('equipment')
-          .select(`
-            *,
-            properties(name),
-            units(name, properties(name)),
-            plant_rooms(name, properties(name))
-          `)
-          .eq('id', equipmentId)
-          .single()
-
-        if (eqError) throw eqError
-        setEquipment(eq)
+        const eqRes = await fetch(`/api/equipment/${equipmentId}`)
+        const eqJson = await eqRes.json()
+        if (!eqRes.ok) throw new Error(eqJson.error || 'Failed to load equipment')
+        setEquipment(eqJson.equipment)
 
         // Fetch failures
-        const { data: failuresData, error: failuresError } = await supabase
-          .from('equipment_failures')
-          .select('*')
-          .eq('equipment_id', equipmentId)
-          .order('failure_date', { ascending: false })
-
-        if (failuresError) throw failuresError
-        setFailures(failuresData || [])
+        const failuresRes = await fetch(`/api/equipment/${equipmentId}/failures`)
+        const failuresJson = await failuresRes.json()
+        if (!failuresRes.ok) throw new Error(failuresJson.error || 'Failed to load failures')
+        setFailures(failuresJson.failures || [])
 
         // Fetch maintenance logs
-        const { data: logsData, error: logsError } = await supabase
-          .from('equipment_maintenance_logs')
-          .select('*, profiles(full_name)')
-          .eq('equipment_id', equipmentId)
-          .order('maintenance_date', { ascending: false })
-          .limit(10)
-
-        if (logsError) throw logsError
-        setMaintenanceLogs(logsData || [])
+        const logsRes = await fetch(`/api/equipment/${equipmentId}/maintenance`)
+        const logsJson = await logsRes.json()
+        if (!logsRes.ok) throw new Error(logsJson.error || 'Failed to load maintenance logs')
+        setMaintenanceLogs(logsJson.logs || [])
 
         // Fetch failure summary
-        const { data: summaryData, error: summaryError } = await supabase
-          .rpc('get_equipment_failure_summary', { p_equipment_id: equipmentId })
-
-        if (summaryError) {
-          logger.warn('Failed to fetch failure summary', summaryError)
+        const summaryRes = await fetch(`/api/equipment/${equipmentId}/failures/summary`)
+        const summaryJson = await summaryRes.json()
+        if (summaryRes.ok) {
+          setFailureSummary(summaryJson.summary)
         } else {
-          setFailureSummary(summaryData)
+          logger.warn('Failed to fetch failure summary', summaryJson.error)
         }
 
       } catch (e: any) {
@@ -118,7 +97,7 @@ export default function EquipmentDetailPage({ params }: { params: Promise<{ equi
         setLoading(false)
       }
     })()
-  }, [equipmentId, supabase])
+  }, [equipmentId])
 
   if (loading) {
     return (

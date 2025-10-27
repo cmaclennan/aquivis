@@ -1,37 +1,33 @@
-import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { SessionTimeoutWrapper } from '@/components/auth/SessionTimeoutWrapper'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function CustomerPortalLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userEmail = headersList.get('x-user-email')
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  // If no user data in headers, middleware didn't authenticate
+  if (!userId) {
     redirect('/customer-portal/login')
   }
 
-  // Verify user has customer access
+  // Get user profile for display
+  const supabase = createAdminClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, email')
-    .eq('id', user.id)
+    .select('email, first_name, last_name')
+    .eq('id', userId)
     .single()
 
-  if (!profile) {
-    redirect('/customer-portal/login')
-  }
-
   return (
-    <SessionTimeoutWrapper timeoutMinutes={60} warningMinutes={5}>
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
         <nav className="bg-white shadow-sm">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex h-16 justify-between">
@@ -63,7 +59,9 @@ export default async function CustomerPortalLayout({
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600 hidden sm:block">{profile.email}</span>
+                <span className="text-sm text-gray-600 hidden sm:block">
+                  {profile?.email || userEmail}
+                </span>
                 <a
                   href="/logout"
                   className="rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
@@ -78,7 +76,6 @@ export default async function CustomerPortalLayout({
           {children}
         </main>
       </div>
-    </SessionTimeoutWrapper>
   )
 }
 

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { Calendar, Clock, Settings, Shuffle, Plus, Trash2, Save, Home } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+ 
 
 // Types for schedule configuration
 interface SimpleScheduleConfig {
@@ -62,7 +63,7 @@ export default function ScheduleBuilder({
   const [scheduleType, setScheduleType] = useState<ScheduleType>('simple')
   const [scheduleName, setScheduleName] = useState('')
   const [scheduleDescription, setScheduleDescription] = useState('')
-  const supabase = useMemo(() => createClient(), [])
+  const { data: session } = useSession()
   const [companyId, setCompanyId] = useState<string>('')
   const [templates, setTemplates] = useState<any[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
@@ -175,29 +176,25 @@ export default function ScheduleBuilder({
     }
   }, [initialSchedule, occupancyEligible])
 
-  // Load company id and templates
+  // Load company id and templates via server API
   useEffect(() => {
-    (async () => {
+    if (!session?.user?.company_id) return
+
+    ;(async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-        if (!profile?.company_id) return
-        setCompanyId(profile.company_id)
-        const { data: tpl } = await supabase
-          .from('schedule_templates')
-          .select('id, template_name, template_type, template_config')
-          .eq('company_id', profile.company_id)
-          .eq('is_active', true)
-          .order('template_name')
-        setTemplates(tpl || [])
-      } catch {}
+        setCompanyId(session.user.company_id)
+        const res = await fetch('/api/templates')
+        const json = await res.json().catch(() => ({}))
+        if (res.ok && !json?.error) {
+          setTemplates(json.templates || [])
+        } else {
+          setTemplates([])
+        }
+      } catch {
+        setTemplates([])
+      }
     })()
-  }, [supabase])
+  }, [session])
 
   // Handle simple schedule changes
   const updateSimpleConfig = (field: keyof SimpleScheduleConfig, value: any) => {
@@ -337,20 +334,15 @@ export default function ScheduleBuilder({
     if (!name) return
     // Reuse current handleSave logic to assemble config/types without calling onSave
     let scheduleConfig: any
-    let serviceTypes: any
     switch (scheduleType) {
       case 'simple':
         scheduleConfig = simpleConfig
-        serviceTypes = { [simpleConfig.frequency]: [simpleConfig.service_type] }
         break
       case 'complex':
         scheduleConfig = complexConfig
-        serviceTypes = {}
-        complexConfig.schedules.forEach(s => (serviceTypes[s.frequency] = s.service_types))
         break
       case 'random_selection':
         scheduleConfig = randomConfig
-        serviceTypes = { [randomConfig.frequency]: [randomConfig.service_type] }
         break
       case 'occupancy':
         scheduleConfig = {
@@ -362,32 +354,31 @@ export default function ScheduleBuilder({
             biweekly_day: occupancyBiweeklyDay,
           },
         }
-        serviceTypes = {}
         break
     }
-    const { error } = await supabase.from('schedule_templates').insert({
-      company_id: companyId,
-      template_name: name,
-      // Persist only supported types; map occupancy to complex with occupancy_rules in config
-      template_type: scheduleType === 'occupancy' ? 'complex' : scheduleType,
-      template_config: scheduleConfig,
-      applicable_unit_types: null,
-      applicable_property_types: null,
-      applicable_water_types: null,
-      is_public: false,
-      is_active: true,
-    })
-    if (!error) {
+
+    try {
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          template_name: name,
+          template_type: scheduleType === 'occupancy' ? 'complex' : scheduleType,
+          template_config: scheduleConfig,
+          applicable_unit_types: null,
+          applicable_water_types: null,
+          description: null,
+          is_active: true,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to save template')
+
       // Reload templates
-      const { data: tpl } = await supabase
-        .from('schedule_templates')
-        .select('id, template_name, template_type, template_config')
-        .eq('company_id', companyId)
-        .eq('is_active', true)
-        .order('template_name')
-      setTemplates(tpl || [])
+      const list = await fetch('/api/templates')
+      const json = await list.json().catch(() => ({}))
+      setTemplates((json && json.templates) || [])
       setTemplateName('')
-    } else {
+    } catch {
       alert('Failed to save template')
     }
   }

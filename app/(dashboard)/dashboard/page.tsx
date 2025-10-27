@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { Building2, CheckCircle2, User, Calendar, Clock, AlertTriangle, TrendingUp, Plus, Droplets } from 'lucide-react'
 import Link from 'next/link'
 import { SentryErrorBoundaryClass } from '@/components/ui/sentry-error-boundary'
@@ -7,21 +8,16 @@ import { PageLoadTracker } from '@/components/metrics/PageLoadTracker'
 import { logger } from '@/lib/logger'
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const companyId = headersList.get('x-user-company-id')
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!userId) {
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*, companies(*)')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.company_id) {
+  if (!companyId) {
     return (
       <div className="p-8">
         <div className="text-center py-8">
@@ -31,96 +27,89 @@ export default async function DashboardPage() {
     )
   }
 
-  // Use optimized dashboard RPC function for 70-90% faster loading
-  let dashboardData: any = null
-  let dashboardStats: any = null
-  let recentServices: any = null
-  let upcomingBookings: any = null
+  const supabase = createAdminClient()
 
-  try {
-    // Call the optimized dashboard function (single query, massive performance boost)
-    logger.debug('[DASHBOARD] Calling get_dashboard_summary RPC for user:', user.id)
-    const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_summary')
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('*, companies(*)')
+    .eq('id', userId)
+    .single()
 
-    logger.debug('[DASHBOARD] RPC Response:', { rpcData, rpcError })
-
-    if (rpcError) throw rpcError
-
-    if (rpcData && !rpcData.error) {
-      logger.debug('[DASHBOARD] RPC Success - stats:', rpcData.stats)
-      dashboardData = rpcData
-      dashboardStats = {
-        company_id: profile.company_id,
-        company_name: profile.companies?.name || 'Company',
-        property_count: rpcData.stats?.active_properties ?? 0,
-        unit_count: 0, // Not in RPC function, will add if needed
-        today_services: rpcData.stats?.today_services ?? 0,
-        week_services: rpcData.stats?.week_services ?? 0,
-        total_services: rpcData.stats?.total_services ?? 0,
-        water_quality_issues: rpcData.stats?.water_quality_issues ?? 0,
-        today_bookings: 0,
-        recent_services: 0
-      }
-      recentServices = rpcData.recent_services ?? []
-    } else {
-      // RPC function returned error, will use fallback
-      logger.warn('[DASHBOARD] RPC function error:', rpcData?.error)
-      logger.debug('Dashboard RPC function not available, using fallback view')
+  if (profileError || !profile) {
+    logger.error('[DASHBOARD] Profile query failed', profileError)
+    // Use data from headers as fallback
+    const fallbackProfile = {
+      id: userId,
+      company_id: companyId,
+      companies: null
     }
-  } catch (error) {
-    // Fallback to optimized view if RPC function fails
-    logger.debug('Dashboard using fallback view', error)
-
-    try {
-      const { data: stats } = await supabase
-        .from('dashboard_stats_optimized')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .single()
-
-      dashboardStats = stats || {
-        company_id: profile.company_id,
-        company_name: profile.companies?.name || 'Company',
-        property_count: 0,
-        unit_count: 0,
-        today_services: 0,
-        week_services: 0,
-        total_services: 0,
-        water_quality_issues: 0,
-        today_bookings: 0,
-        recent_services: 0
-      }
-
-      // Get recent services using optimized view
-      const { data: servicesData } = await supabase
-        .from('services_summary')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      recentServices = servicesData ?? []
-    } catch (fallbackError) {
-      logger.error('Dashboard fallback error', fallbackError)
-      dashboardStats = {
-        company_id: profile.company_id,
-        company_name: profile.companies?.name || 'Company',
-        property_count: 0,
-        unit_count: 0,
-        today_services: 0,
-        week_services: 0,
-        total_services: 0,
-        water_quality_issues: 0,
-        today_bookings: 0,
-        recent_services: 0
-      }
-      recentServices = []
-    }
+    // Continue with fallback data
   }
 
-  // Get upcoming bookings separately (not in RPC function yet)
+  let dashboardStats: any = null
+  let recentServices: any[] = []
+  let upcomingBookings: any[] = []
+
+  const today = new Date()
+  const todayStr = today.toISOString().split('T')[0]
+  const weekAhead = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  const [propCountRes, unitCountRes, totalServicesRes, todayServicesRes, weekServicesRes, issuesCountRes, recentServicesRes] = await Promise.all([
+    (supabase as any)
+      .from('properties')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId),
+    (supabase as any)
+      .from('units')
+      .select('id, properties!inner(company_id)', { count: 'exact', head: true })
+      .eq('properties.company_id', companyId),
+    (supabase as any)
+      .from('services')
+      .select('id, units!inner(properties!inner(company_id))', { count: 'exact', head: true })
+      .eq('units.properties.company_id', companyId),
+    (supabase as any)
+      .from('services')
+      .select('id, units!inner(properties!inner(company_id))', { count: 'exact', head: true })
+      .eq('units.properties.company_id', companyId)
+      .eq('service_date', todayStr),
+    (supabase as any)
+      .from('services')
+      .select('id, units!inner(properties!inner(company_id))', { count: 'exact', head: true })
+      .eq('units.properties.company_id', companyId)
+      .gte('service_date', todayStr)
+      .lt('service_date', weekAhead),
+    (supabase as any)
+      .from('water_tests')
+      .select('id, services!inner(units!inner(properties!inner(company_id)))', { count: 'exact', head: true })
+      .eq('services.units.properties.company_id', companyId)
+      .eq('all_parameters_ok', false)
+      .gte('test_time', sevenDaysAgo),
+    (supabase as any)
+      .from('services')
+      .select('id, service_date, status, units:units!inner(name, properties!inner(name, company_id))')
+      .eq('units.properties.company_id', companyId)
+      .order('created_at', { ascending: false })
+      .limit(5),
+  ])
+
+  dashboardStats = {
+    company_id: companyId,
+    company_name: profile?.companies?.name || 'Company',
+    property_count: propCountRes?.count || 0,
+    unit_count: unitCountRes?.count || 0,
+    today_services: todayServicesRes?.count || 0,
+    week_services: weekServicesRes?.count || 0,
+    total_services: totalServicesRes?.count || 0,
+    water_quality_issues: issuesCountRes?.count || 0,
+    today_bookings: 0,
+    recent_services: 0,
+  }
+
+  recentServices = Array.isArray(recentServicesRes?.data) ? recentServicesRes.data : []
+
   try {
-    const { data: bookingsData } = await supabase
+    const { data: bookingsData } = await (supabase as any)
       .from('bookings')
       .select(`
         *,
@@ -130,13 +119,14 @@ export default async function DashboardPage() {
           properties!inner(name, company_id)
         )
       `)
-      .eq('units.properties.company_id', profile.company_id)
-      .eq('check_in_date', new Date().toISOString().split('T')[0])
+      .eq('units.properties.company_id', companyId)
+      .eq('check_in_date', todayStr)
       .order('check_in_time', { ascending: true })
       .limit(5)
 
     upcomingBookings = bookingsData ?? []
   } catch (error) {
+    logger.debug('[DASHBOARD] Bookings query failed', error)
     upcomingBookings = []
   }
 
@@ -284,10 +274,10 @@ export default async function DashboardPage() {
                       }`} />
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          {service.property_name} - {service.unit_name}
+                          {(service.property_name ?? service.units?.properties?.name ?? 'Property')} - {(service.unit_name ?? service.units?.name ?? 'Unit')}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {service.technician_name} • {new Date(service.service_date).toLocaleDateString()}
+                          {service.technician_name ?? ''} {service.technician_name ? '• ' : ''}{new Date(service.service_date).toLocaleDateString()}
                         </p>
               </div>
             </div>

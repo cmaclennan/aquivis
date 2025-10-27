@@ -1,20 +1,27 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { User, Mail, Phone, Calendar, Shield, Edit } from 'lucide-react'
 
 export default async function ProfilePage() {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const companyId = headersList.get('x-user-company-id')
+
+  if (!userId) {
     redirect('/login')
   }
-  
+
+  if (!companyId) {
+    redirect('/onboarding')
+  }
+
+  const supabase = createAdminClient()
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single()
 
   if (!profile?.company_id) {

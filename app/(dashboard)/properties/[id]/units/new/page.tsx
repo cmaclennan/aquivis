@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Droplets, Hash, Gauge, Calendar as CalIcon } from 'lucide-react'
 import ScheduleBuilder from '@/components/scheduling/ScheduleBuilder'
@@ -17,10 +17,10 @@ export default function NewUnitPage({
 }) {
   // Unwrap params Promise for Next.js 15
   const { id: propertyId } = use(params)
-  
+
   const router = useRouter()
-  const supabase = createClient()
-  
+  const { data: session } = useSession()
+
   const [propertyName, setPropertyName] = useState('')
   const [customers, setCustomers] = useState<Array<{id: string, name: string, customer_type: string}>>([])
   
@@ -42,42 +42,17 @@ const [unitType, setUnitType] = useState<UnitType>('residential_pool')
   // Load property name and customers
   useEffect(() => {
     async function loadData() {
-      // Load property name
-      const { data: property } = await supabase
-        .from('properties')
-        .select('name')
-        .eq('id', propertyId)
-        .single()
-      
-      if (property) {
-        setPropertyName(property.name)
-      }
-
-      // Load company customers for dropdown
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
-        if (profile) {
-          const { data: customersData } = await supabase
-            .from('customers')
-            .select('id, name, customer_type')
-            .eq('company_id', profile.company_id)
-            .eq('is_active', true)
-            .order('name')
-
-          if (customersData) {
-            setCustomers(customersData)
-          }
-        }
-      }
+      try {
+        const propRes = await fetch(`/api/properties/${propertyId}`)
+        const propJson = await propRes.json().catch(() => ({}))
+        if (propRes.ok && !propJson?.error) setPropertyName(propJson.property?.name || '')
+        const custRes = await fetch('/api/customers')
+        const custJson = await custRes.json().catch(() => ({}))
+        setCustomers(custRes.ok && !custJson?.error ? (custJson.customers || []) : [])
+      } catch {}
     }
     loadData()
-  }, [propertyId, supabase])
+  }, [propertyId, session])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,35 +60,11 @@ const [unitType, setUnitType] = useState<UnitType>('residential_pool')
     setError(null)
 
     try {
-      // Get current user and company
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
-
-      // Verify property belongs to company
-      const { data: property } = await supabase
-        .from('properties')
-        .select('id, total_volume_litres')
-        .eq('id', propertyId)
-        .eq('company_id', profile.company_id)
-        .single()
-
-      if (!property) throw new Error('Property not found')
-
-      // Parse volume
       const volume = volumeLitres ? parseInt(volumeLitres) : null
-
-      // Create unit
-      const { data: unit, error: unitError } = await supabase
-        .from('units')
-        .insert({
+      const res = await fetch('/api/units', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           property_id: propertyId,
           unit_number: unitNumber.trim() || null,
           name: name.trim() || null,
@@ -123,38 +74,20 @@ const [unitType, setUnitType] = useState<UnitType>('residential_pool')
           billing_entity: billingEntity,
           customer_id: customerId || null,
           notes: notes.trim() || null,
-        })
-        .select()
-        .single()
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to create unit')
+      const unit = json.unit
 
-      if (unitError) throw unitError
-
-      // Update property total volume if volume was provided
-      if (volume) {
-        const newTotal = (property.total_volume_litres || 0) + volume
-        await supabase
-          .from('properties')
-          .update({ total_volume_litres: newTotal })
-          .eq('id', propertyId)
-      }
-
-      // If a pending custom schedule exists, save it now and set unit to custom
       if (pendingSchedule) {
-        await supabase
-          .from('custom_schedules')
-          .insert({
-            unit_id: unit.id,
-            schedule_type: pendingSchedule.schedule_type,
-            schedule_config: pendingSchedule.schedule_config,
-            service_types: pendingSchedule.service_types,
-            name: pendingSchedule.name,
-            description: pendingSchedule.description,
-            is_active: true
-          })
-        await supabase
-          .from('units')
-          .update({ service_frequency: 'custom' })
-          .eq('id', unit.id)
+        const schedRes = await fetch(`/api/units/${unit.id}/custom-schedule`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(pendingSchedule),
+        })
+        const schedJson = await schedRes.json().catch(() => ({}))
+        if (!schedRes.ok || schedJson?.error) throw new Error(schedJson?.error || 'Failed to save custom schedule')
       }
 
       // Success - redirect to unit detail page

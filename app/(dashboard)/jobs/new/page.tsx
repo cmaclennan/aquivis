@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 
 export default function NewJobPage() {
-  const supabase = createClient()
+  const { data: session } = useSession()
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [jobType, setJobType] = useState<'repair' | 'installation' | 'inspection' | 'other'>('repair')
@@ -22,23 +22,24 @@ export default function NewJobPage() {
   // Load company customers
   useEffect(() => {
     ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
-      if (!profile?.company_id) return
-      const { data } = await supabase.from('customers').select('id, name').eq('company_id', profile.company_id).order('name')
-      setCustomers(data || [])
+      try {
+        const res = await fetch('/api/customers')
+        const json = await res.json().catch(() => ({}))
+        if (res.ok && !json?.error) {
+          setCustomers(json.customers || [])
+        } else {
+          setCustomers([])
+        }
+      } catch {
+        setCustomers([])
+      }
     })()
-  }, [supabase])
+  }, [session])
 
   const save = async () => {
     try {
       setSaving(true)
       setError(null)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
-      if (!profile?.company_id) throw new Error('No company found')
 
       // Determine customer linkage / external contact
       let customerId: string | null = null
@@ -46,38 +47,42 @@ export default function NewJobPage() {
       if (customerChoice === 'new') {
         // Create new customer
         if (!newCustomer.name.trim()) throw new Error('Customer name is required')
-        const { data: c, error: cErr } = await supabase
-          .from('customers')
-          .insert({ 
-            company_id: profile.company_id, 
-            name: newCustomer.name.trim(), 
-            email: newCustomer.email || null, 
-            phone: newCustomer.phone || null, 
+        const res = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: newCustomer.name.trim(),
+            email: newCustomer.email || null,
+            phone: newCustomer.phone || null,
             address: newCustomer.address || null,
-            customer_type: 'property_owner' // Add required field
-          })
-          .select('id')
-          .single()
-        if (cErr) throw cErr
-        customerId = c.id
+            customer_type: 'property_owner',
+          }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to create customer')
+        customerId = json.customer?.id || null
       } else if (customerChoice === 'other') {
         external = externalContact.name || externalContact.email || externalContact.phone || externalContact.address ? externalContact : null
       } else if (customerChoice) {
         customerId = customerChoice
       }
 
-      const { data, error } = await supabase.from('jobs').insert({
-        company_id: profile.company_id,
-        title: title.trim(),
-        job_type: jobType,
-        status,
-        scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-        notes: notes || null,
-        customer_id: customerId,
-        external_contact: external,
-      }).select().single()
-      if (error) throw error
-      router.push(`/jobs/${data.id}`)
+      const resJob = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim(),
+          job_type: jobType,
+          status,
+          scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+          notes: notes || null,
+          customer_id: customerId,
+          external_contact: external,
+        }),
+      })
+      const jsonJob = await resJob.json().catch(() => ({}))
+      if (!resJob.ok || jsonJob?.error) throw new Error(jsonJob?.error || 'Failed to create job')
+      router.push(`/jobs/${jsonJob.job.id}`)
     } catch (e: any) {
       setError(e.message)
     } finally {

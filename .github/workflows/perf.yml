@@ -1,0 +1,98 @@
+name: Performance
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  perf-baseline:
+    name: Baseline (gated)
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
+      E2E_TEST_MODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+
+      - name: Prepare perf configs
+        run: npm run perf:prep
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+
+      - name: Build
+        run: npm run build
+
+      - name: Run Artillery (baseline)
+        run: npx start-server-and-test "next start" http://localhost:3000 "artillery run -o artillery-report.json artillery.config.json"
+
+      - name: Gate thresholds
+        env:
+          P95_MAX_MS: '300'
+          P99_MAX_MS: '600'
+        run: npm run perf:gate
+
+      - name: Server-Timing budgets
+        run: npm run perf:timing:gate
+
+      - name: Upload baseline artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artillery-baseline
+          path: |
+            artillery-report.json
+            reports/server-timing-summary.json
+
+  perf-stress:
+    name: Stress (ungated)
+    runs-on: ubuntu-latest
+    needs: perf-baseline
+    env:
+      NODE_ENV: production
+      E2E_TEST_MODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+
+      - name: Prepare stress perf configs
+        run: npm run perf:prep:stress
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+
+      - name: Build
+        run: npm run build
+
+      - name: Run Artillery (stress)
+        run: npx start-server-and-test "next start" http://localhost:3000 "artillery run -o artillery-stress-report.json artillery.stress.config.json"
+
+      - name: Upload stress artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artillery-stress
+          path: |
+            artillery-stress-report.json
+            reports/server-timing-summary.json
+
+      - name: Download baseline artifacts
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: artillery-baseline
+          path: baseline-artifacts
+
+      - name: Server-Timing diff (info)
+        if: always()
+        run: npm run perf:timing:diff

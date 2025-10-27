@@ -1,7 +1,4 @@
-// Minimal placeholder for Supabase generated types to avoid runtime import errors.
-// Replace with actual generated types when available.
-
-export type Database = Record<string, unknown>;
+// Minimal placeholder comment retained. The concrete Database type is defined below.
 
 export type Json =
   | string

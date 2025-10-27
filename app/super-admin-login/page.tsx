@@ -1,28 +1,50 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import { Shield, Eye, EyeOff, AlertTriangle } from 'lucide-react'
-import { superAdminLoginAction } from './actions'
 
 export default function SuperAdminLoginPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (formData: FormData) => {
     setError(null)
+    setIsLoading(true)
 
-    startTransition(async () => {
-      const result = await superAdminLoginAction(formData)
+    try {
+      const email = formData.get('email') as string
+      const password = formData.get('password') as string
+
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
+
       if (result?.error) {
         setError(result.error)
-      } else if (result?.success && result?.redirectTo) {
-        // Client-side redirect after successful login
-        router.push(result.redirectTo)
+        setIsLoading(false)
+        return
       }
-    })
+
+      // Get session to verify super admin role
+      const response = await fetch('/api/auth/session')
+      const session = await response.json()
+
+      if (session?.user?.role === 'super_admin') {
+        router.push('/super-admin')
+      } else {
+        setError('Access denied: Super admin privileges required')
+        setIsLoading(false)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed')
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -100,10 +122,10 @@ export default function SuperAdminLoginPage() {
           <div>
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isLoading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isPending ? (
+              {isLoading ? (
                 <>
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
                   Signing in...

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
 
 interface Service {
@@ -61,47 +61,25 @@ export default function EditServicePage({ params }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [serviceId, setServiceId] = useState<string>('')
-  
+
+  const { data: session } = useSession()
   const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
 
   const loadService = useCallback(async (id: string) => {
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
-
-      const { data, error } = await supabase
-        .from('services')
-        .select(`
-          *,
-          unit:units(id, name, unit_type),
-          property:properties(id, name),
-          water_tests(*),
-          chemical_additions(*),
-          maintenance_tasks(*)
-        `)
-        .eq('id', id)
-        .eq('property.company_id', profile.company_id)
-        .single()
-
-      if (error) throw error
-      if (!data) throw new Error('Service not found')
-
-      setService(data)
+      const res = await fetch(`/api/services/${id}`, { method: 'GET' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Service not found')
+      if (!json?.service) throw new Error('Service not found')
+      setService(json.service)
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [session])
 
   useEffect(() => {
     params.then((resolvedParams) => {
@@ -118,69 +96,75 @@ export default function EditServicePage({ params }: Props) {
       setError(null)
 
       // Update service
-      const { error: serviceError } = await supabase
-        .from('services')
-        .update({
-          service_date: service.service_date,
-          service_type: service.service_type,
-          status: service.status,
-          notes: service.notes,
-          technician_id: service.technician_id
+      {
+        const res = await fetch(`/api/services/${service.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            service_date: service.service_date,
+            service_type: service.service_type,
+            status: service.status,
+            notes: service.notes,
+            technician_id: service.technician_id,
+          }),
         })
-        .eq('id', service.id)
-
-      if (serviceError) throw serviceError
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to update service')
+      }
 
       // Update water tests
       for (const waterTest of service.water_tests) {
-        const { error: waterTestError } = await supabase
-          .from('water_tests')
-          .update({
+        const resWT = await fetch(`/api/services/${service.id}/water-tests/${waterTest.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             ph: waterTest.ph,
             chlorine: waterTest.chlorine,
             bromine: waterTest.bromine,
             salt: waterTest.salt,
             alkalinity: waterTest.alkalinity,
-            calcium: waterTest.calcium,
-            cyanuric: waterTest.cyanuric,
+            calcium_hardness: waterTest.calcium,
+            cyanuric_acid: waterTest.cyanuric,
             is_pump_running: waterTest.is_pump_running,
             is_water_warm: waterTest.is_water_warm,
             is_filter_cleaned: waterTest.is_filter_cleaned,
             all_parameters_ok: waterTest.all_parameters_ok,
-            notes: waterTest.notes
-          })
-          .eq('id', waterTest.id)
-
-        if (waterTestError) throw waterTestError
+            notes: waterTest.notes,
+          }),
+        })
+        const wtJson = await resWT.json().catch(() => ({}))
+        if (!resWT.ok || wtJson?.error) throw new Error(wtJson?.error || 'Failed to update water test')
       }
 
       // Update chemical additions
       for (const chemical of service.chemical_additions) {
-        const { error: chemicalError } = await supabase
-          .from('chemical_additions')
-          .update({
+        const resChem = await fetch(`/api/services/${service.id}/chemicals/${chemical.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             chemical_type: chemical.chemical_type,
             quantity: chemical.quantity,
             unit_of_measure: chemical.unit_of_measure,
-            cost: chemical.cost
-          })
-          .eq('id', chemical.id)
-
-        if (chemicalError) throw chemicalError
+            cost: chemical.cost,
+          }),
+        })
+        const chemJson = await resChem.json().catch(() => ({}))
+        if (!resChem.ok || chemJson?.error) throw new Error(chemJson?.error || 'Failed to update chemical')
       }
 
       // Update maintenance tasks
       for (const task of service.maintenance_tasks) {
-        const { error: taskError } = await supabase
-          .from('maintenance_tasks')
-          .update({
+        const resTask = await fetch(`/api/services/${service.id}/maintenance/${task.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             task_type: task.task_type,
             completed: task.completed,
-            notes: task.notes
-          })
-          .eq('id', task.id)
-
-        if (taskError) throw taskError
+            notes: task.notes,
+          }),
+        })
+        const taskJson = await resTask.json().catch(() => ({}))
+        if (!resTask.ok || taskJson?.error) throw new Error(taskJson?.error || 'Failed to update task')
       }
 
       router.push(`/services/${service.id}`)
@@ -202,12 +186,9 @@ export default function EditServicePage({ params }: Props) {
       setSaving(true)
       setError(null)
 
-      const { error } = await supabase
-        .from('services')
-        .delete()
-        .eq('id', service.id)
-
-      if (error) throw error
+      const res = await fetch(`/api/services/${service.id}`, { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to delete service')
 
       router.push('/services')
     } catch (err: any) {

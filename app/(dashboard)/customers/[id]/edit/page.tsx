@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Mail, Phone, MapPin, CreditCard, Trash2 } from 'lucide-react'
 import Link from 'next/link'
@@ -17,8 +17,8 @@ export default function EditCustomerPage({
   const { id: customerId } = use(params)
   
   const router = useRouter()
-  const supabase = createClient()
-  
+  const { data: session } = useSession()
+
   // Form state
   const [name, setName] = useState('')
   const [customerType, setCustomerType] = useState<CustomerType>('property_owner')
@@ -41,25 +41,10 @@ export default function EditCustomerPage({
   useEffect(() => {
     async function loadCustomer() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile?.company_id) throw new Error('No company found')
-
-        const { data: customer, error: customerError } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('id', customerId)
-          .eq('company_id', profile.company_id)
-          .single()
-
-        if (customerError) throw customerError
+        const res = await fetch(`/api/customers/${customerId}`)
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load customer')
+        const customer = json.customer
 
         // Populate form
         setName(customer.name)
@@ -80,7 +65,7 @@ export default function EditCustomerPage({
       }
     }
     loadCustomer()
-  }, [customerId, supabase])
+  }, [customerId, session])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,9 +73,10 @@ export default function EditCustomerPage({
     setError(null)
 
     try {
-      const { error: updateError } = await supabase
-        .from('customers')
-        .update({
+      const res = await fetch(`/api/customers/${customerId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: name.trim(),
           customer_type: customerType,
           email: email.trim() || null,
@@ -102,10 +88,10 @@ export default function EditCustomerPage({
           billing_email: billingEmail.trim() || null,
           payment_terms: paymentTerms,
           notes: notes.trim() || null,
-        })
-        .eq('id', customerId)
-
-      if (updateError) throw updateError
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to update customer')
 
       // Success - redirect to customer detail page
       router.push(`/customers/${customerId}`)
@@ -125,13 +111,9 @@ export default function EditCustomerPage({
     setError(null)
 
     try {
-      // Delete customer (units will have customer_id set to NULL due to ON DELETE SET NULL)
-      const { error: deleteError } = await supabase
-        .from('customers')
-        .delete()
-        .eq('id', customerId)
-
-      if (deleteError) throw deleteError
+      const res = await fetch(`/api/customers/${customerId}`, { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to delete customer')
 
       // Success - redirect to customers list
       router.push('/customers')

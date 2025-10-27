@@ -1,14 +1,24 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 
 export default async function CustomerPortalDashboard() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userEmail = headersList.get('x-user-email')
+
+  if (!userId) {
+    redirect('/customer-portal/login')
+  }
+
+  const supabase = createAdminClient()
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, email')
-    .eq('id', user!.id)
+    .eq('id', userId)
     .single()
 
   // Resolve customer by email match (v1 mapping)
@@ -22,7 +32,7 @@ export default async function CustomerPortalDashboard() {
   const { data: linked } = await supabase
     .from('customer_user_links')
     .select('customer_id, customers:customers(id, name)')
-    .eq('user_id', user!.id)
+    .eq('user_id', userId)
 
   const linkedCustomers = (linked || []).map((r: any) => r.customers).filter(Boolean)
   const allowedCustomerIds: string[] = []

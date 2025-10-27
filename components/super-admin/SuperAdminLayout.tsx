@@ -7,7 +7,7 @@ import { Shield, Building2, Users, Activity, LogOut, ChevronDown } from 'lucide-
 interface Company {
   id: string
   name: string
-  business_type: string
+  business_type?: string
   email: string
   created_at: string
   user_count: number
@@ -66,8 +66,8 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    window.location.href = '/login'
+    // Navigate to logout route which clears NextAuth session
+    window.location.href = '/logout'
   }
 
   if (loading) {

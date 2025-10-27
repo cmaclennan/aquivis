@@ -3,30 +3,44 @@
 export const dynamic = 'force-dynamic'
 import { Suspense } from 'react'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { customerPortalLoginAction } from './actions'
 
 function CustomerLoginInner() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
   const params = useSearchParams()
 
   const handleLogin = async (formData: FormData) => {
     setError(null)
+    setIsLoading(true)
 
-    startTransition(async () => {
-      const result = await customerPortalLoginAction(formData)
+    try {
+      const email = formData.get('email') as string
+      const password = formData.get('password') as string
+
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
+
       if (result?.error) {
         setError(result.error)
-      } else if (result?.success && result?.redirectTo) {
-        // Client-side redirect after successful login
-        router.push(result.redirectTo)
+        setIsLoading(false)
+        return
       }
-    })
+
+      // Redirect to customer portal
+      router.push('/customer-portal')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed')
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -76,10 +90,10 @@ function CustomerLoginInner() {
 
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isLoading}
               className="w-full rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
             >
-              {isPending ? 'Signing in...' : 'Sign In'}
+              {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 

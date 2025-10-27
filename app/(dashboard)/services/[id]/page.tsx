@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { ArrowLeft, Edit, Calendar, User, Droplets, AlertTriangle, CheckCircle, Building2 } from 'lucide-react'
 
@@ -9,25 +10,21 @@ export default async function ServiceDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id: serviceId } = await params
-  
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const companyId = headersList.get('x-user-company-id')
+
+  if (!userId) {
     redirect('/login')
   }
-  
-  // Get user's company
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('company_id')
-    .eq('id', user.id)
-    .single()
 
-  if (!profile?.company_id) {
+  if (!companyId) {
     redirect('/onboarding')
   }
+
+  const supabase = createAdminClient()
 
   // Get service with all related data
   const { data: service, error } = await supabase
@@ -40,7 +37,7 @@ export default async function ServiceDetailPage({
       water_tests(*)
     `)
     .eq('id', serviceId)
-    .eq('property.company_id', profile!.company_id)
+    .eq('property.company_id', companyId)
     .single()
 
   if (error || !service) {

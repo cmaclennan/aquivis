@@ -1,15 +1,13 @@
 'use client'
 
 import { use } from 'react'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 type EquipmentCategory = 'pump' | 'filter' | 'chlorinator' | 'heater' | 'other'
 
 export default function PlantRoomCheckPage({ params }: { params: Promise<{ id: string; plantRoomId: string }> }) {
   const { id: propertyId, plantRoomId } = use(params)
-  const supabase = useMemo(() => createClient(), [])
   const [plantRoom, setPlantRoom] = useState<any>(null)
   const [propertyName, setPropertyName] = useState('')
   const [time, setTime] = useState<string>('09:00')
@@ -40,19 +38,12 @@ export default function PlantRoomCheckPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     ;(async () => {
       try {
-        const [{ data: room }, { data: prop }] = await Promise.all([
-          supabase
-            .from('plant_rooms')
-            .select(`
-              id, name, check_times,
-              equipment(id, name, category, notes, measurement_config)
-            `)
-            .eq('id', plantRoomId)
-            .single(),
-          supabase.from('properties').select('name').eq('id', propertyId).single(),
-        ])
+        const res = await fetch(`/api/plant-rooms/${plantRoomId}`)
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load plant room')
+        const room = json.plant_room
         setPlantRoom(room)
-        setPropertyName(prop?.name || '')
+        setPropertyName(room?.properties?.name || '')
         const defaultTime = (room?.check_times && room.check_times[0]) || '09:00'
         setTime(defaultTime)
         const initialChecks: Record<string, EquipmentCheckState> = {}
@@ -64,7 +55,7 @@ export default function PlantRoomCheckPage({ params }: { params: Promise<{ id: s
         setError(e.message)
       }
     })()
-  }, [plantRoomId, propertyId, supabase])
+  }, [plantRoomId, propertyId])
 
   const setField = (eqId: string, patch: Partial<EquipmentCheckState>) => {
     setEquipmentChecks(prev => ({ ...prev, [eqId]: { ...(prev[eqId] || { status: 'normal' }), ...patch } }))
@@ -84,16 +75,7 @@ export default function PlantRoomCheckPage({ params }: { params: Promise<{ id: s
   const save = async () => {
     try {
       setSaving(true)
-      const { data: prCheck, error } = await supabase.from('plant_room_checks').insert({
-        plant_room_id: plantRoomId,
-        check_date: new Date().toISOString().slice(0,10),
-        check_time: time,
-        readings: {},
-        notes: notes || null,
-      }).select().single()
-      if (error) throw error
-
-      const payload = (plantRoom?.equipment || []).map((eq: any) => {
+      const equipmentPayload = (plantRoom?.equipment || []).map((eq: any) => {
         const st = equipmentChecks[eq.id] || { status: 'normal' }
         const readings: any = {}
         if (st.rpm != null) readings.rpm = st.rpm
@@ -105,18 +87,19 @@ export default function PlantRoomCheckPage({ params }: { params: Promise<{ id: s
         if (st.output != null) readings.output = st.output
         if (st.temperature != null) readings.temperature = st.temperature
         if (st.notes) readings.notes = st.notes
-        return {
-          plant_room_check_id: prCheck.id,
-          equipment_id: eq.id,
-          status: st.status,
-          readings,
-          notes: st.notes || null,
-        }
+        return { equipment_id: eq.id, status: st.status, readings, notes: st.notes || null }
       })
-      if (payload.length) {
-        const { error: ecErr } = await supabase.from('equipment_checks').insert(payload)
-        if (ecErr) throw ecErr
-      }
+      const res = await fetch(`/api/plant-rooms/${plantRoomId}/checks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          check_time: time,
+          notes: notes || null,
+          equipment: equipmentPayload,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to save plant room check')
       window.location.href = `/properties/${propertyId}/plant-rooms`
     } catch (e: any) {
       setError(e.message)

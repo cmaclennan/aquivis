@@ -3,11 +3,9 @@
 import { use } from 'react'
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 export default function NewUnitEquipmentPage({ params }: { params: Promise<{ id: string; unitId: string }> }) {
   const { id: propertyId, unitId } = use(params)
-  const supabase = createClient()
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [maintenanceFrequency, setMaintenanceFrequency] = useState('weekly')
@@ -24,17 +22,23 @@ export default function NewUnitEquipmentPage({ params }: { params: Promise<{ id:
     e.preventDefault()
     try {
       setSaving(true)
-      const { error } = await supabase.from('equipment').insert({
-        property_id: propertyId,
-        unit_id: unitId,
-        name,
-        category: category || null,
-        maintenance_frequency: maintenanceFrequency,
-        maintenance_times: maintenanceTimes,
-        notes: notes || null,
-        is_active: true,
+      const res = await fetch('/api/equipment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          property_id: propertyId,
+          unit_id: unitId,
+          equipment_type: category || 'other',
+          name,
+          category: category || null,
+          maintenance_frequency: maintenanceFrequency,
+          maintenance_times: maintenanceTimes,
+          notes: notes || null,
+          is_active: true,
+        }),
       })
-      if (error) throw error
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to add equipment')
       window.location.href = `/properties/${propertyId}/units/${unitId}/equipment`
     } catch (e: any) {
       setError(e.message)

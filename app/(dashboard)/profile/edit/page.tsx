@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft } from 'lucide-react'
 
 export default function EditProfilePage() {
-  const supabase = createClient()
+  const { data: session } = useSession()
   const router = useRouter()
   const { toast } = useToast()
 
@@ -20,46 +20,42 @@ export default function EditProfilePage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!session?.user?.id) return
+
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          setError('Not authenticated')
-          return
-        }
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('first_name, last_name, phone')
-          .eq('id', user.id)
-          .single()
-        if (profileError) throw profileError
-        setFirstName(profile?.first_name || '')
-        setLastName(profile?.last_name || '')
-        setPhone(profile?.phone || '')
+        const res = await fetch('/api/profile')
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load profile')
+        setFirstName(json.profile?.first_name || '')
+        setLastName(json.profile?.last_name || '')
+        setPhone(json.profile?.phone || '')
       } catch (e: any) {
         setError(e.message || 'Failed to load profile')
       } finally {
         setLoading(false)
       }
     })()
-  }, [supabase])
+  }, [session])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!session?.user?.id) return
+
     setSaving(true)
     setError(null)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           first_name: firstName.trim() || null,
           last_name: lastName.trim() || null,
           phone: phone.trim() || null,
-        })
-        .eq('id', user.id)
-      if (updateError) throw updateError
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to save profile')
       toast({ title: 'Profile updated', description: 'Your profile has been saved.' })
       router.push('/profile')
     } catch (e: any) {

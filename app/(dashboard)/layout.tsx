@@ -1,50 +1,73 @@
-import { createClient } from '@/lib/supabase/server'
+export const dynamic = 'force-dynamic'
+
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import Image from 'next/image'
 import { LayoutDashboard, Building2, TrendingUp, Users, UserCircle, LogOut, Droplets, Settings, BarChart3, Calendar } from 'lucide-react'
-import { SessionTimeoutHandler } from '@/components/auth/SessionTimeoutHandler'
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  
-  // Check authentication
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userRole = headersList.get('x-user-role')
+  const companyId = headersList.get('x-user-company-id')
+
+  // If no user data in headers, middleware didn't authenticate (shouldn't happen)
+  if (!userId) {
     redirect('/login')
   }
 
-  // Get user profile and company
-  const { data: profile } = await supabase
+  // Get user profile and company for display
+  const supabase = createAdminClient()
+  const { data: profileData } = await supabase
     .from('profiles')
-    .select('*, companies(*)')
-    .eq('id', user.id)
+    .select('id, first_name, last_name, role, company_id, companies(name)')
+    .eq('id', userId)
     .single()
 
-  if (!profile?.company_id) {
+  const profile = profileData as {
+    id: string
+    first_name?: string | null
+    last_name?: string | null
+    role?: string | null
+    company_id?: string | null
+    companies?: { name?: string | null } | null
+  } | null
+
+  if (!profile) {
     redirect('/onboarding')
   }
 
-  return (
-    <>
-      {/* Session Timeout Handler - 60 min timeout, 5 min warning */}
-      <SessionTimeoutHandler timeoutMinutes={60} warningMinutes={5} />
+  if (!profile.company_id) {
+    redirect('/onboarding')
+  }
 
-      <div className="flex min-h-screen app-surface">
+  const safeProfile = profile as {
+    id: string
+    first_name?: string | null
+    last_name?: string | null
+    role?: string | null
+    company_id?: string | null
+    companies?: { name?: string | null } | null
+  }
+
+  return (
+    <div className="flex min-h-screen app-surface">
         {/* Sidebar */}
         <aside className="flex w-64 flex-col bg-white/95 backdrop-blur border-r border-gray-300 shadow-lg z-10">
         {/* Logo & Company Name */}
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center space-x-3">
             <div className="h-10 w-10 flex-shrink-0 relative">
-              <Image 
-                src="/logo-192.png" 
-                alt="Aquivis Logo" 
+              <Image
+                src="/logo-192.png"
+                alt="Aquivis Logo"
                 width={40}
                 height={40}
                 className="object-contain"
@@ -52,7 +75,7 @@ export default async function DashboardLayout({
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="text-lg font-bold text-gray-900 truncate">Aquivis</h1>
-              <p className="text-xs text-gray-500 truncate">{profile.companies?.name}</p>
+              <p className="text-xs text-gray-500 truncate">{safeProfile.companies?.name}</p>
             </div>
           </div>
         </div>
@@ -115,7 +138,7 @@ export default async function DashboardLayout({
             <BarChart3 className="h-5 w-5" />
             <span>Reports</span>
           </Link>
-          {(profile.role === 'owner' || profile.role === 'super_admin') && (
+          {(safeProfile.role === 'owner' || safeProfile.role === 'super_admin') && (
             <Link
               href="/settings"
               className="flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
@@ -135,9 +158,9 @@ export default async function DashboardLayout({
                 className="min-w-0 flex-1 hover:bg-primary-100 rounded p-1 -m-1 transition-colors"
               >
                 <p className="font-medium text-primary-700 text-sm truncate">
-                  {profile.first_name} {profile.last_name}
+                  {safeProfile.first_name} {safeProfile.last_name}
                 </p>
-                <p className="text-xs text-primary-600 capitalize truncate">{profile.role}</p>
+                <p className="text-xs text-primary-600 capitalize truncate">{safeProfile.role}</p>
               </Link>
               <Link
                 href="/logout"
@@ -151,12 +174,11 @@ export default async function DashboardLayout({
         </div>
       </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
-      </div>
-    </>
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto">
+        {children}
+      </main>
+    </div>
   )
 }
 

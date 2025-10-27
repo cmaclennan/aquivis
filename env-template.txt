@@ -17,3 +17,9 @@ SENTRY_PROJECT=your_sentry_project_here
 
 # Application Configuration
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# NextAuth Configuration
+NEXTAUTH_URL=http://localhost:3000
+# Use either AUTH_SECRET or NEXTAUTH_SECRET
+AUTH_SECRET=your_nextauth_secret_here
+NEXTAUTH_SECRET=your_nextauth_secret_here

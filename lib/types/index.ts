@@ -281,10 +281,4 @@ export interface ScheduledService {
 // ============================================
 // EXPORT ALL TYPES
 // ============================================
-
-// Re-export all types for convenience
-export type {
-  Database,
-  Tables,
-  Enums
-}
+// Note: Avoid re-exporting the same aliases in the same module to prevent TS2484

@@ -54,3 +54,12 @@ Thumbs.db
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Perf & test artifacts
+reports/
+.lighthouseci/
+lhci-headers.json
+artillery.config.json
+.tmp/
+playwright-report/
+test-results/

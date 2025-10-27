@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { BarChart3, Users, ClipboardList, Calendar, Filter, Download } from 'lucide-react'
 
 interface KPI {
@@ -12,7 +12,7 @@ interface KPI {
 }
 
 export default function ManagementDashboardPage() {
-  const supabase = useMemo(() => createClient(), [])
+  const { data: session } = useSession()
   const [kpi, setKpi] = useState<KPI>({ totalServices: 0, completedToday: 0, pendingToday: 0, testsToday: 0 })
   const [activities, setActivities] = useState<any[]>([])
   const [properties, setProperties] = useState<any[]>([])
@@ -27,80 +27,33 @@ export default function ManagementDashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile?.company_id) throw new Error('No company found')
-
-      // Load properties and technicians
-      const [{ data: props }, { data: techs }] = await Promise.all([
-        supabase.from('properties').select('id, name').eq('company_id', profile.company_id),
-        supabase.from('profiles').select('id, first_name, last_name').eq('company_id', profile.company_id).eq('role', 'technician')
-      ])
-      setProperties(props || [])
-      setTechnicians(techs || [])
-
-      // KPI queries
-      const startIso = `${filters.startDate}T00:00:00.000Z`
-      const endIso = `${filters.endDate}T23:59:59.999Z`
-
-      let servicesQuery = supabase
-        .from('services')
-        .select('id, service_date, status, technician_id, units!inner(properties!inner(company_id, id))', { count: 'exact' })
-        .eq('units.properties.company_id', profile.company_id)
-        .gte('service_date', startIso)
-        .lte('service_date', endIso)
-      if (filters.property) servicesQuery = servicesQuery.eq('units.properties.id', filters.property)
-      if (filters.technician) servicesQuery = servicesQuery.eq('technician_id', filters.technician)
-      const { data: services } = await servicesQuery
-
-      const totalServices = services?.length || 0
-      const completedToday = (services || []).filter(s => s.status === 'completed').length
-      const pendingToday = (services || []).filter(s => s.status !== 'completed').length
-
-      let testsQuery = supabase
-        .from('water_tests')
-        .select('id, services!inner(service_date, units!inner(properties!inner(company_id, id)))')
-        .eq('services.units.properties.company_id', profile.company_id)
-        .gte('services.service_date', startIso)
-        .lte('services.service_date', endIso)
-      if (filters.property) testsQuery = testsQuery.eq('services.units.properties.id', filters.property)
-      const { data: tests } = await testsQuery
-      const testsToday = tests?.length || 0
-
-      setKpi({ totalServices, completedToday, pendingToday, testsToday })
-
-      // Activity feed (latest 20 services)
-      let activityQuery = supabase
-        .from('services')
-        .select('id, service_date, service_type, status, units(name, properties(name)), technician_id')
-        .eq('units.properties.company_id', profile.company_id)
-        .gte('service_date', startIso)
-        .lte('service_date', endIso)
-        .order('service_date', { ascending: false })
-        .limit(20)
-      if (filters.property) activityQuery = activityQuery.eq('units.properties.id', filters.property)
-      if (filters.technician) activityQuery = activityQuery.eq('technician_id', filters.technician)
-      const { data: acts } = await activityQuery
-      setActivities(acts || [])
+      const params = new URLSearchParams()
+      params.set('start', filters.startDate)
+      params.set('end', filters.endDate)
+      if (filters.property) params.set('propertyId', filters.property)
+      if (filters.technician) params.set('technicianId', filters.technician)
+      const res = await fetch(`/api/management/overview?${params.toString()}`)
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load management data')
+      setProperties(json.properties || [])
+      setTechnicians(json.technicians || [])
+      setKpi(json.kpi || { totalServices: 0, completedToday: 0, pendingToday: 0, testsToday: 0 })
+      setActivities(json.activities || [])
     } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
-  }, [supabase, filters])
+  }, [filters, session])
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
     loadData()
-  }, [loadData])
+  }, [loadData, session])
 
   const exportActivityCsv = () => {
     const rows = [
@@ -165,7 +118,7 @@ export default function ManagementDashboardPage() {
             <label className="block text-sm font-medium text-gray-700">Technician</label>
             <select value={filters.technician} onChange={(e) => setFilters({ ...filters, technician: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm">
               <option value="">All</option>
-              {technicians.map(t => (<option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>))}
+              {technicians.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
             </select>
           </div>
           <div className="flex items-end">

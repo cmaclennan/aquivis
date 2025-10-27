@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Image from 'next/image'
 
 type BusinessType = 'residential' | 'commercial' | 'both'
@@ -15,50 +15,55 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  const { data: session, status } = useSession()
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+  }, [status, router])
 
   const handleCreateCompany = async () => {
     setLoading(true)
     setError(null)
 
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
+      // Get user ID from NextAuth session
+      if (!session?.user?.id) {
+        throw new Error('Not authenticated')
+      }
 
-      // Create company
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .insert({
-          name: companyName,
-          business_type: businessType,
-          phone: phone,
-          timezone: 'Australia/Brisbane',
-          unit_system: 'metric',
-          date_format: 'DD/MM/YYYY',
-          currency: 'AUD',
-          compliance_jurisdiction: 'QLD',
-        })
-        .select()
-        .single()
-
-      if (companyError) throw companyError
-
-      // Update user profile with company_id
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ company_id: company.id })
-        .eq('id', user.id)
-
-      if (profileError) throw profileError
+      const res = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: companyName, businessType, phone }),
+      })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Failed to create company' }))
+        throw new Error(error)
+      }
 
       // Success - redirect to dashboard
       router.push('/dashboard')
+      router.refresh() // Refresh to update session with new company_id
     } catch (err: any) {
       setError(err.message || 'Failed to create company')
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show loading while checking auth
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-white to-accent-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

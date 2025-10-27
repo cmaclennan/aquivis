@@ -1,35 +1,40 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { Users, UserPlus, Mail, Phone, Calendar, Shield } from 'lucide-react'
 import Link from 'next/link'
 
 export default async function TeamPage() {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userRole = headersList.get('x-user-role')
+  const companyId = headersList.get('x-user-company-id')
+
+  if (!userId) {
     redirect('/login')
   }
-  
+
+  if (!companyId) {
+    redirect('/onboarding')
+  }
+
+  const supabase = createAdminClient()
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, companies(*)')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single()
-
-  if (!profile?.company_id) {
-    redirect('/onboarding')
-  }
 
   // Get all team members for this company
   const { data: teamMembers } = await supabase
     .from('profiles')
     .select('*')
-    .eq('company_id', profile.company_id)
+    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
 
-  const canManageTeam = profile?.role === 'owner' || profile?.role === 'manager'
+  const canManageTeam = userRole === 'owner' || userRole === 'manager'
 
   return (
     <div className="p-8">
@@ -94,7 +99,7 @@ export default async function TeamPage() {
             <div>
               <p className="text-sm text-gray-600">Managers</p>
               <p className="mt-2 text-3xl font-bold text-gray-900">
-                {teamMembers?.filter(m => m.role === 'manager').length || 0}
+                {teamMembers?.filter(m => String(m.role) === 'manager').length || 0}
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
@@ -122,7 +127,7 @@ export default async function TeamPage() {
             <div>
               <p className="text-sm text-gray-600">Customers</p>
               <p className="mt-2 text-3xl font-bold text-gray-900">
-                {teamMembers?.filter(m => m.role === 'customer').length || 0}
+                {teamMembers?.filter(m => String(m.role) === 'customer').length || 0}
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
@@ -183,9 +188,9 @@ export default async function TeamPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      member.role === 'owner' 
+                      String(member.role) === 'owner' 
                         ? 'bg-purple-100 text-purple-800'
-                        : member.role === 'manager'
+                        : String(member.role) === 'manager'
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-green-100 text-green-800'
                     }`}>
@@ -220,7 +225,7 @@ export default async function TeamPage() {
                         {member.role !== 'owner' && (
                           <form action={async () => {
                             'use server'
-                            const supabase = await createClient()
+                            const supabase = createAdminClient()
                             // Soft-remove: clear company_id to detach from team
                             await supabase.from('profiles').update({ company_id: null }).eq('id', member.id)
                           }}>

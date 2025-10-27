@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import SuperAdminLayout from '@/components/super-admin/SuperAdminLayout'
 
@@ -7,23 +7,18 @@ export default async function SuperAdminLayoutWrapper({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  
-  // Check authentication
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    redirect('/login')
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const userRole = headersList.get('x-user-role')
+
+  // If no user data in headers, middleware didn't authenticate
+  if (!userId) {
+    redirect('/super-admin-login')
   }
 
-  // Get user profile and check if super admin
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'super_admin') {
+  // Check if user is super admin
+  if (userRole !== 'super_admin') {
     redirect('/super-admin-login')
   }
 

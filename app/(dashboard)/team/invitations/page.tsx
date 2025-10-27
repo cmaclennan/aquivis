@@ -1,28 +1,27 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 
 export default async function TeamInvitationsPage() {
-  const supabase = await createClient()
+  // Get user data from middleware headers
+  const headersList = await headers()
+  const userId = headersList.get('x-user-id')
+  const companyId = headersList.get('x-user-company-id')
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  if (!userId) {
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('company_id, role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.company_id) {
+  if (!companyId) {
     redirect('/onboarding')
   }
+
+  const supabase = createAdminClient()
 
   const { data: invitations } = await supabase
     .from('team_invitations')
     .select('*')
-    .eq('company_id', profile.company_id)
+    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
 
   return (

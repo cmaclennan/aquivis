@@ -1,14 +1,14 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft } from 'lucide-react'
 
 export default function InviteTeamMemberPage() {
-  const supabase = useMemo(() => createClient(), [])
+  const { data: session } = useSession()
   const router = useRouter()
   const { toast } = useToast()
 
@@ -21,50 +21,32 @@ export default function InviteTeamMemberPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-        if (!profile?.company_id) return
-        const { data: custs } = await supabase
-          .from('customers')
-          .select('id, name')
-          .eq('company_id', profile.company_id)
-          .order('name')
-        setCustomers(custs || [])
+        const res = await fetch('/api/reports/lookups', { method: 'GET' })
+        const json = await res.json().catch(() => ({}))
+        if (res.ok && json?.customers) setCustomers(json.customers)
       } catch {}
     })()
-  }, [supabase])
+  }, [session])
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!session?.user?.company_id) return
+
     setLoading(true)
     try {
-      // Create an invitation row with token
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: me } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-      if (!me?.company_id) throw new Error('No company found')
+      const resCreate = await fetch('/api/team/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), role, customerId: role === 'customer' ? (customerId || null) : null }),
+      })
+      const createJson = await resCreate.json().catch(() => ({}))
+      if (!resCreate.ok || createJson?.error) throw new Error(createJson?.error || 'Failed to create invitation')
 
-      const { data: invite, error } = await supabase.from('team_invitations').insert({
-        company_id: me.company_id,
-        email: email.trim(),
-        role,
-        customer_id: role === 'customer' ? (customerId || null) : null,
-        invited_by: user.id,
-      }).select('token').single()
-      if (error) throw error
-
-      const inviteLink = `${window.location.origin}/invite/accept?token=${invite.token}`
+      const inviteLink = `${window.location.origin}/invite/accept?token=${createJson.token}`
       // Send email via API (server route uses Resend)
       const res = await fetch('/api/send-invite', {
         method: 'POST',

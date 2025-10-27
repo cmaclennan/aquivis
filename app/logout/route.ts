@@ -1,15 +1,15 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { signOut } from '@/lib/auth'
 
 export async function GET(request: Request) {
-  const supabase = await createClient()
+  // Use NextAuth signOut to clear session reliably
+  try {
+    await signOut({ redirect: false })
+  } catch {
+    // no-op: fallback redirect will still occur
+  }
 
-  await supabase.auth.signOut()
-
-  // Use request URL for proper environment handling (dev, staging, production)
-  const requestUrl = new URL(request.url)
-  const redirectUrl = new URL('/login', requestUrl.origin)
-
-  return NextResponse.redirect(redirectUrl)
+  const url = new URL(request.url)
+  return NextResponse.redirect(new URL('/login', url.origin))
 }
 

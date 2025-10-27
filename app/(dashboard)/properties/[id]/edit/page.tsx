@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Building2, MapPin, Phone, Mail, User, Trash2 } from 'lucide-react'
 import Link from 'next/link'
@@ -17,8 +17,8 @@ export default function EditPropertyPage({
   const { id: propertyId } = use(params)
   
   const router = useRouter()
-  const supabase = createClient()
-  
+  const { data: session } = useSession()
+
   // Form state
   const [name, setName] = useState('')
   const [propertyType, setPropertyType] = useState<PropertyType>('residential')
@@ -38,25 +38,10 @@ export default function EditPropertyPage({
   useEffect(() => {
     async function loadProperty() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile?.company_id) throw new Error('No company found')
-
-        const { data: property, error: propertyError } = await supabase
-          .from('properties')
-          .select('*')
-          .eq('id', propertyId)
-          .eq('company_id', profile.company_id)
-          .single()
-
-        if (propertyError) throw propertyError
+        const res = await fetch(`/api/properties/${propertyId}`)
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load property')
+        const property = json.property
 
         // Populate form
         setName(property.name)
@@ -74,7 +59,7 @@ export default function EditPropertyPage({
       }
     }
     loadProperty()
-  }, [propertyId, supabase])
+  }, [propertyId, session])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -82,9 +67,10 @@ export default function EditPropertyPage({
     setError(null)
 
     try {
-      const { error: updateError } = await supabase
-        .from('properties')
-        .update({
+      const res = await fetch(`/api/properties/${propertyId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: name.trim(),
           property_type: propertyType,
           has_individual_units: hasIndividualUnits,
@@ -93,10 +79,10 @@ export default function EditPropertyPage({
           contact_email: contactEmail.trim() || null,
           contact_phone: contactPhone.trim() || null,
           notes: notes.trim() || null,
-        })
-        .eq('id', propertyId)
-
-      if (updateError) throw updateError
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to update property')
 
       // Success - redirect to property detail page
       router.push(`/properties/${propertyId}`)
@@ -116,13 +102,9 @@ export default function EditPropertyPage({
     setError(null)
 
     try {
-      // Delete property (cascade will delete units)
-      const { error: deleteError } = await supabase
-        .from('properties')
-        .delete()
-        .eq('id', propertyId)
-
-      if (deleteError) throw deleteError
+      const res = await fetch(`/api/properties/${propertyId}`, { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to delete property')
 
       // Success - redirect to properties list
       router.push('/properties')

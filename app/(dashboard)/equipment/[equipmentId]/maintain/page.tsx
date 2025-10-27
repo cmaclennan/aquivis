@@ -3,11 +3,9 @@
 import { use } from 'react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 export default function EquipmentMaintainPage({ params }: { params: Promise<{ equipmentId: string }> }) {
   const { equipmentId } = use(params)
-  const supabase = createClient()
   const [equipment, setEquipment] = useState<any>(null)
   const [actions, setActions] = useState<any>({})
   const [notes, setNotes] = useState('')
@@ -18,29 +16,31 @@ export default function EquipmentMaintainPage({ params }: { params: Promise<{ eq
   useEffect(() => {
     ;(async () => {
       try {
-        const { data } = await supabase
-          .from('equipment')
-          .select('id, name, property_id, unit_id, plant_room_id')
-          .eq('id', equipmentId)
-          .single()
-        setEquipment(data)
+        const res = await fetch(`/api/equipment/${equipmentId}`)
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load equipment')
+        setEquipment(json.equipment)
       } catch (e: any) {
         setError(e.message)
       }
     })()
-  }, [equipmentId, supabase])
+  }, [equipmentId])
 
   const save = async () => {
     try {
       setSaving(true)
-      const { error } = await supabase.from('equipment_maintenance_logs').insert({
-        equipment_id: equipmentId,
-        maintenance_date: new Date().toISOString().slice(0,10),
-        maintenance_time: time,
-        actions,
-        notes: notes || null,
+      const res = await fetch(`/api/equipment/${equipmentId}/maintenance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          maintenance_date: new Date().toISOString().slice(0, 10),
+          maintenance_time: time,
+          actions,
+          notes: notes || null,
+        }),
       })
-      if (error) throw error
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to save maintenance log')
       window.history.back()
     } catch (e: any) {
       setError(e.message)

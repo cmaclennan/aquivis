@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import ScheduleBuilder from '@/components/scheduling/ScheduleBuilder'
 
@@ -18,7 +18,7 @@ type TemplateRow = {
 }
 
 export default function TemplatesPage() {
-  const supabase = useMemo(() => createClient(), [])
+  const { data: session } = useSession()
   const [companyId, setCompanyId] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -33,35 +33,26 @@ export default function TemplatesPage() {
   const [renameValue, setRenameValue] = useState<string>('')
 
   const load = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-      if (!profile?.company_id) throw new Error('No company found')
-      setCompanyId(profile.company_id)
-
-      const { data, error: err } = await supabase
-        .from('schedule_templates')
-        .select('id, template_name, template_type, template_config, is_active, created_at, applicable_unit_types, applicable_water_types, description')
-        .eq('company_id', profile.company_id)
-        .order('template_name')
-      if (err) throw err
-      setTemplates((data || []) as any)
+      setCompanyId(session.user.company_id)
+      const res = await fetch('/api/templates')
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load templates')
+      setTemplates((json.templates || []) as any)
     } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [session])
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
     load()
-  }, [load])
+  }, [load, session])
 
   const saveNewTemplate = async (schedule: any) => {
     try {
@@ -70,18 +61,21 @@ export default function TemplatesPage() {
       const name = (schedule.name || '').trim() || 'New Template'
       const tags = templateTags.split(',').map(t => t.trim()).filter(Boolean)
       const withMeta = { ...(schedule.schedule_config || {}), meta: { tags, version_note: versionNote } }
-      const { error: err } = await supabase.from('schedule_templates').insert({
-        company_id: companyId,
-        template_name: name,
-        template_type: finalType,
-        template_config: withMeta,
-        applicable_unit_types: unitTypeScope.length ? unitTypeScope : null,
-        applicable_water_types: waterTypeScope.length ? waterTypeScope : null,
-        description: versionNote || null,
-        is_active: true,
-        is_public: false,
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          template_name: name,
+          template_type: finalType,
+          template_config: withMeta,
+          applicable_unit_types: unitTypeScope.length ? unitTypeScope : null,
+          applicable_water_types: waterTypeScope.length ? waterTypeScope : null,
+          description: versionNote || null,
+          is_active: true,
+        }),
       })
-      if (err) throw err
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to save template')
       setShowBuilder(false)
       setEditingTemplate(null)
       setTemplateTags(''); setVersionNote(''); setUnitTypeScope([]); setWaterTypeScope([])
@@ -101,19 +95,20 @@ export default function TemplatesPage() {
       const name = (schedule.name || '').trim() || editingTemplate.template_name || 'Template'
       const tags = templateTags.split(',').map(t => t.trim()).filter(Boolean)
       const withMeta = { ...(schedule.schedule_config || {}), meta: { tags, version_note: versionNote } }
-      const { error: err } = await supabase
-        .from('schedule_templates')
-        .update({
+      const res = await fetch(`/api/templates/${editingTemplate.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           template_name: name,
           template_type: finalType,
           template_config: withMeta,
           applicable_unit_types: unitTypeScope.length ? unitTypeScope : null,
           applicable_water_types: waterTypeScope.length ? waterTypeScope : null,
           description: versionNote || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editingTemplate.id)
-      if (err) throw err
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to update template')
       setShowBuilder(false)
       setEditingTemplate(null)
       setTemplateTags(''); setVersionNote(''); setUnitTypeScope([]); setWaterTypeScope([])
@@ -129,18 +124,21 @@ export default function TemplatesPage() {
     try {
       setLoading(true)
       const name = `Copy of ${t.template_name}`
-      const { error: err } = await supabase.from('schedule_templates').insert({
-        company_id: companyId,
-        template_name: name,
-        template_type: t.template_type,
-        template_config: t.template_config,
-        applicable_unit_types: t.applicable_unit_types || null,
-        applicable_water_types: t.applicable_water_types || null,
-        description: t.description || null,
-        is_active: t.is_active,
-        is_public: false,
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          template_name: name,
+          template_type: t.template_type,
+          template_config: t.template_config,
+          applicable_unit_types: t.applicable_unit_types || null,
+          applicable_water_types: t.applicable_water_types || null,
+          description: t.description || null,
+          is_active: t.is_active,
+        }),
       })
-      if (err) throw err
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to duplicate template')
       await load()
     } catch (e: any) {
       setError(e.message)
@@ -150,15 +148,15 @@ export default function TemplatesPage() {
   }
 
   const deactivate = async (id: string) => {
-    await supabase.from('schedule_templates').update({ is_active: false }).eq('id', id)
+    await fetch(`/api/templates/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: false }) })
     await load()
   }
   const activate = async (id: string) => {
-    await supabase.from('schedule_templates').update({ is_active: true }).eq('id', id)
+    await fetch(`/api/templates/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: true }) })
     await load()
   }
   const remove = async (id: string) => {
-    await supabase.from('schedule_templates').delete().eq('id', id)
+    await fetch(`/api/templates/${id}`, { method: 'DELETE' })
     await load()
   }
   const startRename = (t: TemplateRow) => {
@@ -167,7 +165,7 @@ export default function TemplatesPage() {
   }
   const submitRename = async () => {
     if (!renamingId) return
-    await supabase.from('schedule_templates').update({ template_name: renameValue.trim() || 'Template' }).eq('id', renamingId)
+    await fetch(`/api/templates/${renamingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ template_name: renameValue.trim() || 'Template' }) })
     setRenamingId('')
     setRenameValue('')
     await load()

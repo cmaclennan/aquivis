@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { BarChart3, TrendingUp, Calendar, Filter, Download, X } from 'lucide-react'
 
@@ -42,10 +42,10 @@ export default function ReportsClient() {
   const [equipmentLogs, setEquipmentLogs] = useState<any[]>([])
   const [includeTechCsv, setIncludeTechCsv] = useState(false)
   const [includeActionDetailsCsv, setIncludeActionDetailsCsv] = useState(false)
-  
+
   const [filters, setFilters] = useState<Filters>({
     dateRange: '30d',
-    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
     serviceType: '',
     unitType: '',
@@ -53,155 +53,93 @@ export default function ReportsClient() {
     status: ''
   })
 
-  const supabase = useMemo(() => createClient(), [])
+  const { data: session } = useSession()
 
   const loadData = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
+      // Load lookups (properties, customers)
+      const lookupsRes = await fetch('/api/reports/lookups', { method: 'GET' })
+      const lookups = await lookupsRes.json().catch(() => ({}))
+      if (!lookupsRes.ok || lookups?.error) throw new Error(lookups?.error || 'Failed to load lookups')
+      setProperties(lookups.properties || [])
+      setCustomers(lookups.customers || [])
 
-      if (!profile?.company_id) throw new Error('No company found')
-
-      // Load properties and customers
-      const [{ data: propertiesData, error: propertiesError }, { data: customersData, error: customersError }] = await Promise.all([
-        supabase.from('properties').select('id, name').eq('company_id', profile.company_id),
-        supabase.from('customers').select('id, name').eq('company_id', profile.company_id)
-      ])
-
-      if (propertiesError) throw propertiesError
-      if (customersError) throw customersError
-      setProperties(propertiesData || [])
-      setCustomers(customersData || [])
-
-      // Build query
-      let query = supabase
-        .from('services')
-        .select(`
-          *,
-          units!inner(
-            name,
-            unit_type,
-            properties!inner(name, company_id)
-          )
-        `)
-        .eq('units.properties.company_id', profile.company_id)
-
-      // Apply date filter
-      if (filters.dateRange === 'custom') {
-        query = query
-          .gte('service_date', `${filters.startDate}T00:00:00.000Z`)
-          .lte('service_date', `${filters.endDate}T23:59:59.999Z`)
-      } else {
-        const days = filters.dateRange === '7d' ? 7 : filters.dateRange === '30d' ? 30 : 90
-        const startDate = new Date()
-        startDate.setDate(startDate.getDate() - days)
-        query = query.gte('service_date', startDate.toISOString())
-      }
-
-      // Apply other filters
-      if (filters.serviceType) {
-        query = query.eq('service_type', filters.serviceType)
-      }
-      if (filters.unitType) {
-        query = query.eq('units.unit_type', filters.unitType)
-      }
-      if (filters.property) {
-        query = query.eq('units.properties.id', filters.property)
-      }
-      if (filters.status) {
-        query = query.eq('status', filters.status)
-      }
-
-      const { data, error } = await query.order('service_date', { ascending: false })
-
-      if (error) throw error
-      setServices(data || [])
-
-      // Load chemical totals using existing chemical_additions table
-      let chemQuery = supabase
-        .from('chemical_additions')
-        .select(`chemical_type, unit_of_measure, quantity, services!inner(service_date, units!inner(properties!inner(company_id)))`)
-        .eq('services.units.properties.company_id', profile.company_id)
-
-      if (filters.dateRange === 'custom') {
-        chemQuery = chemQuery
-          .gte('services.service_date', `${filters.startDate}T00:00:00.000Z`)
-          .lte('services.service_date', `${filters.endDate}T23:59:59.999Z`)
-      } else {
-        const days = filters.dateRange === '7d' ? 7 : filters.dateRange === '30d' ? 30 : 90
-        const startDate = new Date()
-        startDate.setDate(startDate.getDate() - days)
-        chemQuery = chemQuery.gte('services.service_date', startDate.toISOString())
-      }
-
-      const { data: chemData } = await chemQuery
-      const grouped: Record<string, { quantity: number; unit: string }> = {}
-      ;(chemData || []).forEach((row: any) => {
-        const key = row.chemical_type || 'unknown'
-        if (!grouped[key]) grouped[key] = { quantity: 0, unit: row.unit_of_measure || '' }
-        grouped[key].quantity += Number(row.quantity || 0)
-        grouped[key].unit = row.unit_of_measure || grouped[key].unit
+      // Load services
+      const servicesRes = await fetch('/api/reports/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dateRange: filters.dateRange,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          serviceType: filters.serviceType,
+          unitType: filters.unitType,
+          property: filters.property,
+          status: filters.status,
+        }),
       })
-      setChemTotals(grouped)
+      const servicesJson = await servicesRes.json().catch(() => ({}))
+      if (!servicesRes.ok || servicesJson?.error) throw new Error(servicesJson?.error || 'Failed to load services')
+      setServices(servicesJson.services || [])
+
+      // Load chemical totals
+      const chemRes = await fetch('/api/reports/chemicals/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dateRange: filters.dateRange,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+        }),
+      })
+      const chemJson = await chemRes.json().catch(() => ({}))
+      if (!chemRes.ok || chemJson?.error) throw new Error(chemJson?.error || 'Failed to load chemical totals')
+      setChemTotals(chemJson.totals || {})
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [supabase, filters])
+  }, [filters, session])
 
   const loadEquipmentData = useCallback(async () => {
+    if (!session?.user?.company_id) return
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-      if (!profile?.company_id) throw new Error('No company found')
 
-      // Date filter
-      const startIso = `${filters.startDate}T00:00:00.000Z`
-      const endIso = `${filters.endDate}T23:59:59.999Z`
-
-      let eqQuery = supabase
-        .from('equipment_maintenance_logs')
-        .select('maintenance_date, maintenance_time, actions, notes, equipment:equipment_id(name, properties!inner(id, name, company_id))')
-        .eq('equipment.properties.company_id', profile.company_id)
-        .gte('maintenance_date', filters.startDate)
-        .lte('maintenance_date', filters.endDate)
-        .order('maintenance_date', { ascending: false })
-
-      if (filters.property) {
-        eqQuery = eqQuery.eq('equipment.properties.id', filters.property)
-      }
-
-      const { data, error } = await eqQuery
-      if (error) throw error
-      setEquipmentLogs(data || [])
+      const res = await fetch('/api/reports/equipment/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          property: filters.property,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load equipment logs')
+      setEquipmentLogs(json.logs || [])
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [supabase, filters])
+  }, [filters, session])
 
   useEffect(() => {
+    if (!session?.user?.company_id) return
+
     if (activeTab === 'services') {
       loadData()
     } else {
       loadEquipmentData()
     }
-  }, [filters, activeTab, loadData, loadEquipmentData])
+  }, [filters, activeTab, loadData, loadEquipmentData, session])
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters(prev => {
@@ -257,100 +195,38 @@ export default function ReportsClient() {
   const exportBillingCsv = async () => {
     // Build a grouped billing export by customer and property for chemicals
     // and append Jobs (existing customers + one-off)
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-      const startIso = `${filters.startDate}T00:00:00.000Z`
-      const endIso = `${filters.endDate}T23:59:59.999Z`
-
-      let rowsQuery = supabase
-        .from('chemical_additions')
-        .select(`quantity, unit_of_measure, chemical_type, services!inner(service_date, units!inner(id, customer_id, properties!inner(id, name, customer_id, company_id)))`)
-        .eq('services.units.properties.company_id', profile!.company_id)
-        .gte('services.service_date', startIso)
-        .lte('services.service_date', endIso)
-
-      const { data: chemRows, error } = await rowsQuery
-      if (error) throw error
-
-      // Load pricebook
-      const { data: prices } = await supabase
-        .from('company_chemical_prices')
-        .select('chemical_code, unit, price_per_unit, property_id')
-        .eq('company_id', profile!.company_id)
-
-      const priceKey = (code: string, unit: string, propertyId?: string) => `${propertyId || 'all'}::${code}::${unit}`
-      const priceMap: Record<string, number> = {}
-      ;(prices || []).forEach((p: any) => { priceMap[priceKey(p.chemical_code, p.unit, p.property_id || undefined)] = Number(p.price_per_unit) })
-
-      const customerNameById = new Map<string, string>(customers.map((c: any) => [c.id, c.name]))
-      const propertyNameById = new Map<string, string>(properties.map((p: any) => [p.id, p.name]))
-
-      type Key = string
-      const grouped: Record<Key, { customer: string; property: string; chemical: string; unit: string; quantity: number; cost: number }>
-        = {}
-      ;(chemRows || []).forEach((r: any) => {
-        const property = r.services?.units?.properties
-        const custId = r.services?.units?.customer_id || property?.customer_id || ''
-        const customerName = customerNameById.get(custId) || 'Unassigned'
-        const chem = r.chemical_type || 'unknown'
-        const unit = r.unit_of_measure || ''
-        const key = `${customerName}||${property?.name || ''}||${chem}||${unit}`
-        const qty = Number(r.quantity || 0)
-        const unitPrice = priceMap[priceKey(chem, unit, property?.id)] ?? priceMap[priceKey(chem, unit)] ?? 0
-        if (!grouped[key]) grouped[key] = { customer: customerName, property: property?.name || '', chemical: chem, unit, quantity: 0, cost: 0 }
-        grouped[key].quantity += qty
-        grouped[key].cost += qty * unitPrice
+      const res = await fetch('/api/reports/billing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate: filters.startDate, endDate: filters.endDate }),
       })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to build billing data')
 
-      // Fetch jobs in range (completed or scheduled in window if not completed)
-      const { data: jobsCompleted } = await supabase
-        .from('jobs')
-        .select('id, title, status, price_cents, completed_at, scheduled_at, customer_id, property_id, external_contact, company_id')
-        .eq('company_id', profile!.company_id)
-        .not('completed_at', 'is', null)
-        .gte('completed_at', startIso)
-        .lte('completed_at', endIso)
-
-      const { data: jobsScheduled } = await supabase
-        .from('jobs')
-        .select('id, title, status, price_cents, completed_at, scheduled_at, customer_id, property_id, external_contact, company_id')
-        .eq('company_id', profile!.company_id)
-        .is('completed_at', null)
-        .gte('scheduled_at', startIso)
-        .lte('scheduled_at', endIso)
-
-      const jobsAll = ([...(jobsCompleted || []), ...(jobsScheduled || [])] as any[])
-      const jobsExisting = jobsAll.filter(j => !!j.customer_id)
-      const jobsOneOff = jobsAll.filter(j => !j.customer_id)
+      const chemicals = (json.chemicals || []) as Array<{ customer: string; property: string; chemical: string; unit: string; quantity: number; cost: number }>
+      const jobsExisting = (json.jobsExisting || []) as Array<{ customer: string; property: string; title: string; status: string; price: number }>
+      const jobsOneOff = (json.jobsOneOff || []) as Array<{ contactName: string; contactEmail: string; contactPhone: string; title: string; status: string; price: number }>
 
       const rows = [
         ['Customer', 'Property', 'Chemical', 'Quantity', 'Unit', 'Cost'],
-        ...Object.values(grouped).map(g => [g.customer, g.property, g.chemical, g.quantity.toFixed(2), g.unit, g.cost.toFixed(2)])
+        ...chemicals.map(g => [g.customer, g.property, g.chemical, g.quantity.toFixed(2), g.unit, g.cost.toFixed(2)]),
       ]
 
       rows.push([])
       rows.push(['Jobs (Existing Customers)'])
       rows.push(['Customer', 'Property', 'Title', 'Status', 'Price'])
-      jobsExisting.forEach((j: any) => {
-        const custName = customerNameById.get(j.customer_id) || 'Unknown'
-        const propName = j.property_id ? (propertyNameById.get(j.property_id) || '') : ''
-        const price = (Number(j.price_cents || 0) / 100).toFixed(2)
-        rows.push([custName, propName, j.title || '', (j.status || '').replace('_',' '), price])
+      jobsExisting.forEach((j) => {
+        rows.push([j.customer, j.property, j.title, j.status, j.price.toFixed(2)])
       })
 
       rows.push([])
       rows.push(['Jobs (One-off)'])
       rows.push(['Contact', 'Email', 'Phone', 'Title', 'Status', 'Price'])
-      jobsOneOff.forEach((j: any) => {
-        const c = j.external_contact || {}
-        const price = (Number(j.price_cents || 0) / 100).toFixed(2)
-        rows.push([c.name || '', c.email || '', c.phone || '', j.title || '', (j.status || '').replace('_',' '), price])
+      jobsOneOff.forEach((j) => {
+        rows.push([j.contactName, j.contactEmail, j.contactPhone, j.title, j.status, j.price.toFixed(2)])
       })
       const csv = rows.map(r => r.map(String).map(v => '"' + v.replaceAll('"', '""') + '"').join(',')).join('\n')
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -366,37 +242,25 @@ export default function ReportsClient() {
   }
 
   const exportEquipmentCsv = async () => {
+    if (!session?.user?.company_id) return
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single()
-      const startIso = `${filters.startDate}T00:00:00.000Z`
-      const endIso = `${filters.endDate}T23:59:59.999Z`
-      const { data: logs } = await supabase
-        .from('equipment_maintenance_logs')
-        .select('maintenance_date, maintenance_time, actions, notes, performed_by, equipment:equipment_id(name, properties!inner(name, company_id))')
-        .eq('equipment.properties.company_id', profile!.company_id)
-        .gte('maintenance_date', filters.startDate)
-        .lte('maintenance_date', filters.endDate)
-        .order('maintenance_date', { ascending: false })
+      const logs = equipmentLogs
 
       // Map technician names if requested
       let techNameById: Record<string, string> = {}
       if (includeTechCsv) {
-        const ids = Array.from(new Set(((logs || []) as any[]).map(r => r.performed_by).filter(Boolean)))
+        const ids = Array.from(new Set(((logs || []) as any[]).map((r: any) => r.performed_by).filter(Boolean)))
         if (ids.length) {
-          const { data: techs } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name')
-            .in('id', ids as string[])
-          ;(techs || []).forEach((t: any) => {
-            const name = `${t.first_name || ''} ${t.last_name || ''}`.trim() || 'Technician'
-            techNameById[t.id] = name
+          const res = await fetch('/api/reports/technicians', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
           })
+          const json = await res.json().catch(() => ({}))
+          if (res.ok && json?.map) {
+            techNameById = json.map as Record<string, string>
+          }
         }
       }
 

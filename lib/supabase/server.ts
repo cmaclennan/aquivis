@@ -13,12 +13,13 @@ export async function createClient() {
       cookies: {
         getAll() {
           const allCookies = cookieStore.getAll()
-          // Log auth cookies for debugging
-          const authCookies = allCookies.filter(c =>
-            c.name.includes('auth') || c.name.includes('sb-')
-          )
-          if (authCookies.length === 0) {
-            logger.warn('[SUPABASE] No auth cookies found in server request')
+          // Optional debug: only log when explicitly enabled
+          const debug = process.env.SUPABASE_DEBUG_COOKIES === 'true'
+          if (debug) {
+            const hasAuth = allCookies.some(c => c.name.includes('auth') || c.name.includes('sb-'))
+            if (!hasAuth && (logger as any)?.debug) {
+              ;(logger as any).debug('[SUPABASE] No auth cookies found in server request')
+            }
           }
           return allCookies
         },
